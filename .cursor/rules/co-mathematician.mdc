@@ -1,5 +1,5 @@
 ---
-description: Coding-agent-driven AI co-mathematician workspace rules
+description: Coding-agent-driven AI Co-Mathematician workspace rules
 globs:
   - "**/*"
 alwaysApply: true
@@ -7,7 +7,7 @@ alwaysApply: true
 
 # Coding-Agent Co-Mathematician Rules
 
-This repository is a coding-agent-driven AI co-mathematician workspace.
+This repository is a coding-agent-driven AI Co-Mathematician workspace.
 
 When Cursor is operating in this repository:
 
@@ -39,7 +39,7 @@ Hard rules:
 
 Cursor operating notes:
 
-- Read `AGENTS.md` and `.agents/skills/codex-co-mathematician/SKILL.md` before running a research project.
+- Read `AGENTS.md` and `.agents/skills/co-mathematician/SKILL.md` before running a research project.
 - Use Agent mode to edit durable files under `workspace/`.
 - Use `co-math` only for initialization, message append, workstream creation, gate checks, and final rendering.
 - If native subagents are unavailable, create independent reviewer passes with fresh prompts and save reviewer outputs in `workspace/workstreams/<id>/reviews/`.

@@ -2,7 +2,7 @@
 
 ## Repository Contract
 
-This repository is a coding-agent-driven AI co-mathematician workspace.
+This repository is a coding-agent-driven AI Co-Mathematician workspace.
 
 The coding agent is the driver:
 
@@ -35,7 +35,7 @@ or another repository-aware coding agent.
 
 - Codex should read `AGENTS.md`, `.codex/config.toml`, and the custom agent definitions in `.codex/agents/`.
 - Claude Code should read `CLAUDE.md` and may use Task/subagent-style delegation for workstreams and reviews.
-- Cursor should read `.cursor/rules/codex-co-mathematician.mdc` and use Agent mode with durable file edits.
+- Cursor should read `.cursor/rules/co-mathematician.mdc` and use Agent mode with durable file edits.
 - If an environment has no native subagent feature, the Project Coordinator must still create an independent review pass with a fresh prompt and save the review artifact under the workstream `reviews/` directory.
 - No agent may self-approve its own workstream report.
 
@@ -52,7 +52,7 @@ chosen project language.
 
 ## Architecture Principles
 
-These rules are adapted from the public AI co-mathematician paper
+These rules are adapted from the public AI Co-Mathematician paper
 `arXiv:2605.06651v2`:
 
 - Mathematics research is broader than proof search: literature, examples, computation, counterexamples, definitions, and exposition are first-class work.

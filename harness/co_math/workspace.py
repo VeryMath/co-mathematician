@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover - fallback for minimal Python environments
     yaml = None
 
 
-DEFAULT_PROJECT_MD = """# Codex Co-Mathematician Project
+DEFAULT_PROJECT_MD = """# Co-Mathematician Project
 
 This workspace is initialized but no mathematical research project has started.
 

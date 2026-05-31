@@ -1,4 +1,4 @@
-# Codex Co-Mathematician Project
+# Co-Mathematician Project
 
 This workspace is initialized but no mathematical research project has started.
 

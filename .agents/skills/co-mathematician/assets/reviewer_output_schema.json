@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Co-Mathematician Reviewer Output",
+  "title": "Co-Mathematician Reviewer Output",
   "type": "object",
   "required": [
     "approved",

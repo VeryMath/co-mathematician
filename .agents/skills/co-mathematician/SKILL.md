@@ -1,9 +1,9 @@
 ---
-name: codex-co-mathematician
+name: co-mathematician
 description: Use when conducting a coding-agent-driven mathematical research project that needs durable workspace state, approved goals, parallel workstreams, reviewer gates, provenance, uncertainty tracking, failed exploration records, and a final working paper.
 ---
 
-# Codex Co-Mathematician
+# Co-Mathematician
 
 Use this skill to run mathematical research as a stateful coding-agent workspace.
 Codex, Claude Code, Cursor, or another repository-aware coding agent remains the

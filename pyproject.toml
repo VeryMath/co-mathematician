@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codex-co-mathematician-workspace"
+name = "co-mathematician-workspace"
 version = "0.1.0"
-description = "Lightweight harness for a coding-agent-driven AI co-mathematician workspace."
+description = "Lightweight harness for a coding-agent-driven AI Co-Mathematician workspace."
 requires-python = ">=3.9"
 dependencies = ["PyYAML>=6.0"]
 

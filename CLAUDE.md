@@ -2,7 +2,7 @@
 
 ## Repository Contract
 
-This repository is a coding-agent-driven AI co-mathematician workspace.
+This repository is a coding-agent-driven AI Co-Mathematician workspace.
 
 When Claude Code is operating in this repository:
 
@@ -35,7 +35,7 @@ Hard rules:
 ## Claude Code Operating Notes
 
 - Treat this file and `AGENTS.md` as the repository-level contract.
-- Use the `codex-co-mathematician` Skill if it is installed; otherwise follow `.agents/skills/codex-co-mathematician/SKILL.md`.
+- Use the `co-mathematician` Skill if it is installed; otherwise follow `.agents/skills/co-mathematician/SKILL.md`.
 - Use `co-math` commands only for workspace state, gates, and report rendering.
 - Use Claude Code Task/subagent-style delegation for narrow proof, computation, citation, logic-review, adversarial-review, or synthesis work when available.
 - If no delegation mechanism is available, run a separate reviewer pass from a fresh reviewer prompt and save the output in `workspace/workstreams/<id>/reviews/`.

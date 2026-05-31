@@ -1,13 +1,13 @@
-# Codex Co-Mathematician
+# Co-Mathematician
 
 > English | [中文](README.zh-CN.md)
 
-A lightweight, coding-agent-driven workspace pattern for mathematical research.
+A lightweight, coding-agent-driven Co-Mathematician workspace pattern for mathematical research.
 It is designed to work after cloning in Codex, Claude Code, Cursor, or another
 repository-aware coding agent.
 
 This project is inspired by the public design principles described in Google
-DeepMind's [AI co-mathematician paper](https://arxiv.org/abs/2605.06651), but
+DeepMind's [AI Co-Mathematician paper](https://arxiv.org/abs/2605.06651), but
 it is **not** a reproduction of their system. It adapts those ideas into a
 coding-agent-native, filesystem-based workflow.
 
@@ -22,7 +22,7 @@ report skeletons, and validation scripts.
 - `AGENTS.md`: hard operating rules for Codex and other coding agents.
 - `CLAUDE.md`: Claude Code entry instructions.
 - `.cursor/rules/`: Cursor Agent rules.
-- `.agents/skills/codex-co-mathematician/`: the Codex Skill and reusable templates.
+- `.agents/skills/co-mathematician/`: the Skill and reusable templates.
 - `.codex/`: narrow custom agent definitions for proof, computation, review, citation checking, and synthesis.
 - `harness/co_math/`: a small Python harness for workspace state and gates.
 - `workspace/`: an empty scaffold for a new project.
@@ -57,14 +57,14 @@ right entry file before starting:
 
 | Agent | Entry files |
 | --- | --- |
-| Codex | `AGENTS.md`, `.agents/skills/codex-co-mathematician/SKILL.md`, `.codex/config.toml` |
-| Claude Code | `CLAUDE.md`, `AGENTS.md`, `.agents/skills/codex-co-mathematician/SKILL.md` |
-| Cursor | `.cursor/rules/codex-co-mathematician.mdc`, `AGENTS.md`, `.agents/skills/codex-co-mathematician/SKILL.md` |
+| Codex | `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, `.codex/config.toml` |
+| Claude Code | `CLAUDE.md`, `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md` |
+| Cursor | `.cursor/rules/co-mathematician.mdc`, `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md` |
 
 Suggested first prompt:
 
 ```text
-Use this repository as a coding-agent-driven AI co-mathematician workspace.
+Use this repository as a coding-agent-driven AI Co-Mathematician workspace.
 Read the repository instructions first. You are the Project Coordinator.
 
 Initialize the workspace, then start onboarding. First ask me to choose the
@@ -82,8 +82,8 @@ co-math init --workspace workspace
 
 ## Use The Skill
 
-Ask your coding agent to use the `codex-co-mathematician` Skill or the local
-instructions in `.agents/skills/codex-co-mathematician/SKILL.md`. The workflow is:
+Ask your coding agent to use the `co-mathematician` Skill or the local
+instructions in `.agents/skills/co-mathematician/SKILL.md`. The workflow is:
 
 ```text
 onboarding -> research question formalization -> goal approval -> workstreams -> reviewer loop -> final working paper
