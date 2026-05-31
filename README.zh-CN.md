@@ -45,6 +45,44 @@ agents/roles/       canonical, platform-neutral role cards
 仓库文件系统是 shared artifact store。harness 不负责运行 agents；它只提供 schema、
 状态文件、gates、报告骨架和验证脚本。
 
+## 工作区框架
+
+```mermaid
+flowchart TD
+    User["人类数学研究者"] --> Coordinator["Coding agent 主线程<br/>Project Coordinator"]
+
+    Coordinator --> Onboarding["Onboarding<br/>澄清背景、符号、约束"]
+    Onboarding --> ProjectFiles["项目状态<br/>PROJECT.md<br/>GOALS.yaml<br/>PROJECT_STATUS.md<br/>messages.jsonl"]
+
+    ProjectFiles --> GoalGate{"Goal approved?"}
+    GoalGate -- "否" --> Onboarding
+    GoalGate -- "是" --> Workstreams["Approved workstreams"]
+
+    Workstreams --> Proof["Proof exploration"]
+    Workstreams --> Compute["Computational experiment"]
+    Workstreams --> Literature["Literature / citation check"]
+    Workstreams --> ReviewPrep["Report drafting"]
+
+    Proof --> Artifacts["Durable artifacts<br/>notes, code, logs, failures"]
+    Compute --> Artifacts
+    Literature --> Artifacts
+    ReviewPrep --> Report["workstreams/*/report.md"]
+    Artifacts --> Report
+
+    Report --> Reviewers["Independent reviewers<br/>logic, adversarial, citation"]
+    Reviewers --> ReviewGate{"Review passed?"}
+    ReviewGate -- "否" --> Revision["修改或升级给用户<br/>保留 uncertainty 和 failures"]
+    Revision --> Workstreams
+    ReviewGate -- "是" --> Complete["Workstream complete"]
+
+    Complete --> Final["final/working_paper.md"]
+
+    Harness["co-math harness<br/>init, messages, workstreams, gates, render-final"]
+    Harness -. validates .-> GoalGate
+    Harness -. validates .-> ReviewGate
+    Harness -. renders .-> Final
+```
+
 ## Adapter Matrix
 
 | Coding agent | 优先读取 | Native adapter |

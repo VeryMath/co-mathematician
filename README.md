@@ -47,6 +47,44 @@ The repository filesystem is the shared artifact store. The harness does not run
 agents; it only provides schema, state files, gates, report skeletons, and
 validation scripts.
 
+## Workspace Framework
+
+```mermaid
+flowchart TD
+    User["Human mathematician"] --> Coordinator["Coding agent main thread<br/>Project Coordinator"]
+
+    Coordinator --> Onboarding["Onboarding<br/>clarify context, notation, constraints"]
+    Onboarding --> ProjectFiles["Project state<br/>PROJECT.md<br/>GOALS.yaml<br/>PROJECT_STATUS.md<br/>messages.jsonl"]
+
+    ProjectFiles --> GoalGate{"Goal approved?"}
+    GoalGate -- "no" --> Onboarding
+    GoalGate -- "yes" --> Workstreams["Approved workstreams"]
+
+    Workstreams --> Proof["Proof exploration"]
+    Workstreams --> Compute["Computational experiment"]
+    Workstreams --> Literature["Literature / citation check"]
+    Workstreams --> ReviewPrep["Report drafting"]
+
+    Proof --> Artifacts["Durable artifacts<br/>notes, code, logs, failures"]
+    Compute --> Artifacts
+    Literature --> Artifacts
+    ReviewPrep --> Report["workstreams/*/report.md"]
+    Artifacts --> Report
+
+    Report --> Reviewers["Independent reviewers<br/>logic, adversarial, citation"]
+    Reviewers --> ReviewGate{"Review passed?"}
+    ReviewGate -- "no" --> Revision["Revise or escalate<br/>preserve uncertainty and failures"]
+    Revision --> Workstreams
+    ReviewGate -- "yes" --> Complete["Workstream complete"]
+
+    Complete --> Final["final/working_paper.md"]
+
+    Harness["co-math harness<br/>init, messages, workstreams, gates, render-final"]
+    Harness -. validates .-> GoalGate
+    Harness -. validates .-> ReviewGate
+    Harness -. renders .-> Final
+```
+
 ## Adapter Matrix
 
 | Coding agent | Reads first | Native adapter |
