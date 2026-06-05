@@ -1,12 +1,13 @@
-# Co-Mathematician
+# Co-Mathematician Workspace
 
 > English | [中文](README.zh-CN.md)
 
-Co-Mathematician is a lightweight, coding-agent-driven workspace pattern for
-mathematical research. It is meant to be cloned and used inside Codex, Claude
-Code, Cursor, or another repository-aware coding agent.
+Co-Mathematician is a lightweight research workspace for using a repository-aware
+coding agent as an AI co-mathematician. It is designed to be cloned, opened in
+Codex, Claude Code, Cursor, OpenCode, or another coding agent, and used as a
+stateful mathematical research environment.
 
-The core idea is simple:
+The core formula is:
 
 ```text
 coding agent + repo filesystem + gates + reviewer loop = research workspace
@@ -16,36 +17,194 @@ This project is inspired by public design principles from Google DeepMind's
 [AI Co-Mathematician paper](https://arxiv.org/abs/2605.06651), but it is **not**
 a reproduction of their system.
 
-## What This Is
+## What This Workspace Does
 
-- A stateful workspace for mathematical research projects.
-- A set of hard operating rules for coding agents.
-- A platform-neutral role layer with Codex, Claude Code, and Cursor adapters.
-- A small Python harness for initialization, state files, gates, messages, and final report rendering.
+Co-Mathematician turns a math research conversation into a file-backed project:
 
-## What This Is Not
+- the coding agent main thread acts as the Project Coordinator
+- `workspace/project/` stores the research question, goals, status, and messages
+- `workspace/workstreams/` stores proof, computation, literature, and review work
+- reviewer agents or separate reviewer sessions check reports before completion
+- `workspace/final/working_paper.md` is rendered only from reviewed reports
 
-- Not a new multi-agent platform.
-- Not a web app.
-- Not an autonomous theorem-proving system.
-- Not a solved research project or paper corpus.
-- Not a replacement for a coding agent. The coding agent is the driver.
+The Python harness does not run agents. It only initializes files, appends
+messages, creates approved workstreams, checks gates, and renders the final
+working paper.
 
-## Architecture
+## Install And Open The Workspace
 
-Co-Mathematician separates canonical role definitions from platform-specific
-agent adapters:
+Clone the repository:
 
-```text
-agents/roles/       canonical, platform-neutral role cards
-.codex/agents/      Codex TOML adapters
-.claude/agents/     Claude Code Markdown subagent adapters
-.cursor/rules/      Cursor project-rule adapters
+```bash
+git clone https://github.com/ConanXu-math/co-mathematician.git
+cd co-mathematician
 ```
 
-The repository filesystem is the shared artifact store. The harness does not run
-agents; it only provides schema, state files, gates, report skeletons, and
-validation scripts.
+Install the local harness:
+
+```bash
+python3 -m pip install -e ".[dev]"
+co-math --help
+```
+
+Initialize the workspace files:
+
+```bash
+co-math init --workspace workspace
+```
+
+Then open this folder in your coding agent.
+
+Suggested options:
+
+- **Codex**: open this repository as the working directory and ask Codex to use
+  `.agents/skills/co-mathematician/SKILL.md`.
+- **Claude Code**: open this repository and let Claude Code read `CLAUDE.md`,
+  `AGENTS.md`, and `agents/roles/`.
+- **Cursor**: open this repository and use the rules in `.cursor/rules/`.
+- **OpenCode + DeepSeek or another provider**: configure your model provider
+  first, then open this repository. Never paste API keys into repo files.
+
+Without installing the package, use:
+
+```bash
+PYTHONPATH=. python3 -m harness.co_math.cli --help
+```
+
+## First Interaction
+
+After opening the repository in your coding agent, start with a prompt like:
+
+```text
+Use this repository as a Co-Mathematician research workspace.
+You are the Project Coordinator.
+
+First read AGENTS.md and the co-mathematician Skill.
+Initialize the workspace if needed, then start onboarding.
+First ask me to choose the workspace document language policy.
+
+Do not solve the math problem yet.
+Do not create any workstream until I explicitly approve goals.
+Do not mark anything complete until reviewer gates pass.
+```
+
+The first onboarding choice should be the workspace document language policy:
+
+1. English for all workspace documents.
+2. User language for research notes, English for schemas, gates, and reviews.
+3. User language for all human-readable research documents.
+4. Match each project or conversation.
+
+## Starting A Research Project
+
+Give the agent your problem context only after onboarding starts:
+
+```text
+I want to start a mathematical research project.
+
+Problem context:
+...
+
+Known definitions, notation, and constraints:
+...
+
+Relevant references or files:
+...
+
+Please formalize the research question and propose goals.
+Do not create workstreams yet.
+```
+
+The Project Coordinator should update:
+
+```text
+workspace/project/PROJECT.md
+workspace/project/GOALS.yaml
+workspace/project/PROJECT_STATUS.md
+workspace/project/messages.jsonl
+```
+
+Draft goals are not executable. A goal can receive workstreams only when its
+status is:
+
+```yaml
+status: approved
+```
+
+Check a goal gate:
+
+```bash
+co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
+```
+
+Approve goals in chat with a clear instruction:
+
+```text
+I approve goal G1 as written.
+You may create workstreams for G1.
+```
+
+## Creating Workstreams
+
+After goal approval, ask the Project Coordinator to create focused workstreams:
+
+```text
+Create a literature workstream for approved goal G1.
+The workstream should identify relevant known results, exact theorem
+statements, assumptions, and citation provenance.
+```
+
+or:
+
+```text
+Create a proof exploration workstream for approved goal G1.
+Preserve failed attempts and expose unresolved uncertainty in the report.
+```
+
+The harness command is:
+
+```bash
+co-math new-workstream \
+  --workspace workspace \
+  --goal-id G1 \
+  --title "Literature baseline review" \
+  --kind literature
+```
+
+Allowed workstream kinds are `proof`, `computation`, `literature`, and `review`.
+
+Each workstream should produce a report with:
+
+- provenance for important claims
+- explicit uncertainty
+- failed explorations
+- independent reviewer output under `reviews/`
+
+Check completion:
+
+```bash
+co-math check-gate \
+  --workspace workspace \
+  --gate workstream_completion \
+  --workstream-id WS-G1-001-example
+```
+
+## Rendering The Working Paper
+
+When workstream reports pass independent review, render the final working paper:
+
+```bash
+co-math render-final --workspace workspace
+```
+
+The output is:
+
+```text
+workspace/final/working_paper.md
+```
+
+This is a working paper, not a chat summary. It should preserve provenance,
+uncertainty, failed explorations, and reviewer status.
 
 ## Workspace Framework
 
@@ -53,7 +212,7 @@ validation scripts.
 flowchart TD
     User["Human mathematician"] --> Coordinator["Coding agent main thread<br/>Project Coordinator"]
 
-    Coordinator --> Onboarding["Onboarding<br/>clarify context, notation, constraints"]
+    Coordinator --> Onboarding["Onboarding<br/>context, language policy, notation, constraints"]
     Onboarding --> ProjectFiles["Project state<br/>PROJECT.md<br/>GOALS.yaml<br/>PROJECT_STATUS.md<br/>messages.jsonl"]
 
     ProjectFiles --> GoalGate{"Goal approved?"}
@@ -63,12 +222,12 @@ flowchart TD
     Workstreams --> Proof["Proof exploration"]
     Workstreams --> Compute["Computational experiment"]
     Workstreams --> Literature["Literature / citation check"]
-    Workstreams --> ReviewPrep["Report drafting"]
+    Workstreams --> ReportDraft["Report drafting"]
 
     Proof --> Artifacts["Durable artifacts<br/>notes, code, logs, failures"]
     Compute --> Artifacts
     Literature --> Artifacts
-    ReviewPrep --> Report["workstreams/*/report.md"]
+    ReportDraft --> Report["workstreams/*/report.md"]
     Artifacts --> Report
 
     Report --> Reviewers["Independent reviewers<br/>logic, adversarial, citation"]
@@ -85,127 +244,6 @@ flowchart TD
     Harness -. renders .-> Final
 ```
 
-## Adapter Matrix
-
-| Coding agent | Reads first | Native adapter |
-| --- | --- | --- |
-| Codex | `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, `agents/roles/` | `.codex/config.toml`, `.codex/agents/*.toml` |
-| Claude Code | `CLAUDE.md`, `AGENTS.md`, `agents/roles/` | `.claude/agents/*.md` |
-| Cursor | `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, `agents/roles/` | Cursor project rules and focused Agent sessions |
-
-If a coding-agent environment has no native subagent feature, use a fresh
-reviewer prompt or separate session and save the review under the workstream
-`reviews/` directory.
-
-## Quick Start
-
-Clone the repository and open it in your coding agent:
-
-```bash
-git clone https://github.com/ConanXu-math/co-mathematician.git
-cd co-mathematician
-python3 -m pip install -e ".[dev]"
-co-math init --workspace workspace
-```
-
-Then give your coding agent this first prompt:
-
-```text
-Use this repository as a coding-agent-driven AI Co-Mathematician workspace.
-Read the repository instructions first. You are the Project Coordinator.
-
-Initialize the workspace, then start onboarding. First ask me to choose the
-workspace document language policy. Do not solve the math problem, do not create
-a workstream, and do not mark anything complete until the required goal approval
-and reviewer gates pass.
-```
-
-Without installing the package, use:
-
-```bash
-PYTHONPATH=. python3 -m harness.co_math.cli --help
-```
-
-## Workflow
-
-```text
-onboarding -> research question formalization -> goal approval -> workstreams -> reviewer loop -> final working paper
-```
-
-Hard gates:
-
-- Onboarding comes before goal approval.
-- Workstreams may start only for explicitly approved goals.
-- Important claims require provenance.
-- Failed explorations are durable artifacts, not trash.
-- Uncertainty must be visible in reports and status updates.
-- Every workstream report requires an independent reviewer.
-- A failed review blocks completion.
-- The final output is a working paper, not a chat summary.
-
-## Starting A Project
-
-Initialize the scaffold:
-
-```bash
-co-math init --workspace workspace
-```
-
-The Project Coordinator then updates:
-
-```text
-workspace/project/PROJECT.md
-workspace/project/GOALS.yaml
-workspace/project/PROJECT_STATUS.md
-workspace/project/messages.jsonl
-```
-
-The first onboarding preference should be the document language policy:
-
-1. English for all workspace documents.
-2. User language for research notes, English for schemas, gates, and reviews.
-3. User language for all human-readable research documents.
-4. Match each project or conversation.
-
-Draft goals are not executable. A goal can receive workstreams only when its
-status is:
-
-```yaml
-status: approved
-```
-
-Check the approval gate:
-
-```bash
-co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
-```
-
-Create a workstream for an approved goal:
-
-```bash
-co-math new-workstream \
-  --workspace workspace \
-  --goal-id G1 \
-  --title "Literature baseline review" \
-  --kind literature
-```
-
-Allowed workstream kinds are `proof`, `computation`, `literature`, and `review`.
-
-## Role Cards
-
-Canonical roles live in `agents/roles/`:
-
-- `proof_explorer`: proof strategies, reductions, examples, and proof gaps.
-- `computational_experimenter`: scoped computations and reproducibility checks.
-- `logic_reviewer`: logical correctness and dependency review.
-- `adversarial_reviewer`: counterexamples, hidden assumptions, and overclaim checks.
-- `citation_checker`: provenance and source-to-claim alignment.
-- `synthesis_agent`: synthesis from reviewer-approved workstream reports only.
-
-These roles are intentionally narrow. They cannot approve goals, start
-unapproved workstreams, or mark their own reports complete.
-
 ## Harness Commands
 
 ```bash
@@ -216,6 +254,27 @@ co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
 co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-example
 co-math render-final --workspace workspace
 ```
+
+## Agent Adapters
+
+Co-Mathematician separates role definitions from platform-specific adapters:
+
+```text
+agents/roles/       canonical, platform-neutral role cards
+.codex/agents/      Codex TOML adapters
+.claude/agents/     Claude Code Markdown subagent adapters
+.cursor/rules/      Cursor project-rule adapters
+```
+
+| Coding agent | Reads first | Native adapter |
+| --- | --- | --- |
+| Codex | `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, `agents/roles/` | `.codex/config.toml`, `.codex/agents/*.toml` |
+| Claude Code | `CLAUDE.md`, `AGENTS.md`, `agents/roles/` | `.claude/agents/*.md` |
+| Cursor | `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, `agents/roles/` | Cursor project rules and focused Agent sessions |
+
+If your coding-agent environment has no native subagent feature, use a fresh
+reviewer prompt or a separate session and save the review under the workstream
+`reviews/` directory.
 
 ## Repository Layout
 
