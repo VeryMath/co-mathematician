@@ -31,6 +31,23 @@ workstreams、检查 gates、渲染 final working paper。
 
 ## 安装并打开工作区
 
+你可以手动安装，也可以让 coding agent 帮你完成拉取和初始化。
+
+### Agent-led setup
+
+如果你的 coding agent 可以运行 shell 命令，可以先这样说：
+
+```text
+请你拉取这个仓库：
+https://github.com/ConanXu-math/co-mathematician
+
+把它作为当前工作区打开，安装本地 harness，并初始化 `workspace/`。
+完成后开始 Co-Mathematician onboarding。
+不要启动任何数学 workstream。
+```
+
+### 手动安装
+
 clone 仓库：
 
 ```bash

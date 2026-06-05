@@ -33,6 +33,23 @@ working paper.
 
 ## Install And Open The Workspace
 
+You can set up the workspace manually, or ask your coding agent to do it.
+
+### Agent-led setup
+
+If your coding agent can run shell commands, start with:
+
+```text
+Please clone this repository:
+https://github.com/ConanXu-math/co-mathematician
+
+Open it as the current workspace, install the local harness, and initialize
+`workspace/`. After that, start Co-Mathematician onboarding.
+Do not start any mathematical workstream yet.
+```
+
+### Manual setup
+
 Clone the repository:
 
 ```bash
