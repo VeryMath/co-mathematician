@@ -91,16 +91,16 @@ PYTHONPATH=. python3 -m harness.co_math.cli --help
 在 coding agent 中打开仓库后，可以用类似这样的第一条 prompt：
 
 ```text
-Use this repository as a Co-Mathematician research workspace.
-You are the Project Coordinator.
+请把这个仓库作为 Co-Mathematician 数学研究工作区使用。
+你是 Project Coordinator。
 
-First read AGENTS.md and the co-mathematician Skill.
-Initialize the workspace if needed, then start onboarding.
-First ask me to choose the workspace document language policy.
+请先阅读 AGENTS.md 和 co-mathematician Skill。
+如果 workspace 还没有初始化，请先初始化；然后开始 onboarding。
+第一步请让我选择 workspace 文档语言策略。
 
-Do not solve the math problem yet.
-Do not create any workstream until I explicitly approve goals.
-Do not mark anything complete until reviewer gates pass.
+现在不要解数学问题。
+在我明确 approve goals 之前，不要创建任何 workstream。
+在 reviewer gates 通过之前，不要把任何内容标记为 complete。
 ```
 
 onboarding 的第一个偏好问题应该是文档语言策略：
@@ -115,19 +115,19 @@ onboarding 的第一个偏好问题应该是文档语言策略：
 onboarding 开始后，再把问题背景给 agent：
 
 ```text
-I want to start a mathematical research project.
+我想开始一个数学研究项目。
 
-Problem context:
+问题背景：
 ...
 
-Known definitions, notation, and constraints:
+已知定义、符号和约束：
 ...
 
-Relevant references or files:
+相关文献、文件或上下文：
 ...
 
-Please formalize the research question and propose goals.
-Do not create workstreams yet.
+请先 formalize research question，并提出 proposed goals。
+现在不要创建 workstreams。
 ```
 
 Project Coordinator 应更新：
@@ -154,8 +154,8 @@ co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
 在对话里明确 approve：
 
 ```text
-I approve goal G1 as written.
-You may create workstreams for G1.
+我批准 goal G1，按当前写法执行。
+你现在可以为 G1 创建 workstreams。
 ```
 
 ## 创建 Workstreams
@@ -163,16 +163,16 @@ You may create workstreams for G1.
 goal approval 之后，再让 Project Coordinator 创建聚焦的 workstreams：
 
 ```text
-Create a literature workstream for approved goal G1.
-The workstream should identify relevant known results, exact theorem
-statements, assumptions, and citation provenance.
+请为已批准的 goal G1 创建一个 literature workstream。
+这个 workstream 需要找出相关已知结果、精确的 theorem statements、
+适用假设，以及 citation provenance。
 ```
 
 或者：
 
 ```text
-Create a proof exploration workstream for approved goal G1.
-Preserve failed attempts and expose unresolved uncertainty in the report.
+请为已批准的 goal G1 创建一个 proof exploration workstream。
+请保存失败尝试，并在 report 中显式暴露 unresolved uncertainty。
 ```
 
 harness 命令是：
