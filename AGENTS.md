@@ -6,9 +6,8 @@ This repository is a coding-agent-driven AI Co-Mathematician workspace.
 
 The coding agent is the driver:
 
-- In Codex, the Codex main thread is the Project Coordinator.
-- In Claude Code, the main Claude Code conversation is the Project Coordinator.
-- In Cursor, the active Agent chat/session is the Project Coordinator.
+- The active main conversation/session in the chosen coding agent is the Project Coordinator.
+- Platform examples: Codex main thread, Claude Code main conversation, Cursor active Agent chat/session.
 - The repository filesystem is the shared artifact store.
 - Project-local skills under `.agents/skills/` are the default skill environment.
 - `agents/roles/` is the canonical role layer.
@@ -35,16 +34,17 @@ The coding agent is the driver:
 
 ## Agent Compatibility
 
-This workspace is intended to work after cloning in Codex, Claude Code, Cursor,
-or another repository-aware coding agent.
+This workspace is intended to work after cloning in any repository-aware coding
+agent.
 
+- Every coding-agent environment should read `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, and `agents/roles/`.
 - Install or copy additional project-specific skills into `.agents/skills/` by default.
 - Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when the user explicitly wants a personal installation shared across projects.
 - Use `co-math refresh-skills --workspace workspace` to write `workspace/project/skill_registry.json` and `workspace/project/SKILL_REGISTRY.md`.
 - Use `co-math suggest-skills --workspace workspace --query "..."` before goal formalization and workstream creation.
-- Codex should read `AGENTS.md`, `agents/roles/`, `.codex/config.toml`, and `.codex/agents/`.
-- Claude Code should read `CLAUDE.md`, `agents/roles/`, and `.claude/agents/`.
-- Cursor should read `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, and `agents/roles/`.
+- Codex may also use `.codex/config.toml` and `.codex/agents/`.
+- Claude Code may also use `CLAUDE.md` and `.claude/agents/`.
+- Cursor may also use `.cursor/rules/co-mathematician.mdc` and `.cursor/rules/co-mathematician-roles.mdc`.
 - If an environment has no native subagent feature, the Project Coordinator must still create an independent review pass with a fresh prompt and save the review artifact under the workstream `reviews/` directory.
 - No agent may self-approve its own workstream report.
 

@@ -3,8 +3,9 @@
 > [English](README.md) | 中文
 
 Co-Mathematician 是一个轻量级的数学研究工作区。它的用法不是启动一个新的
-multi-agent platform，而是把一个能读写仓库的 coding agent，例如 Codex、Claude
-Code、Cursor、OpenCode，组织成一个可追踪、可复核、可接续的数学研究环境。
+multi-agent platform，而是把一个能读写仓库的 coding agent 组织成一个可追踪、
+可复核、可接续的数学研究环境。Codex、Claude Code、Cursor、OpenCode 等工具
+只是同一套 workspace protocol 的 adapters。
 
 核心公式是：
 
@@ -39,7 +40,7 @@ workstreams、检查 gates、渲染 final working paper。
 
 ```text
 请你拉取这个仓库：
-https://github.com/ConanXu-math/co-mathematician
+https://github.com/VeryMath/co-mathematician
 
 把它作为当前工作区打开，安装本地 harness，并初始化 `workspace/`。
 完成后开始 Co-Mathematician onboarding。
@@ -51,7 +52,7 @@ https://github.com/ConanXu-math/co-mathematician
 clone 仓库：
 
 ```bash
-git clone https://github.com/ConanXu-math/co-mathematician.git
+git clone https://github.com/VeryMath/co-mathematician.git
 cd co-mathematician
 ```
 
@@ -72,10 +73,11 @@ co-math init --workspace workspace
 
 建议方式：
 
-- **Codex**：把这个仓库作为工作目录打开，并让 Codex 使用
-  `.agents/skills/co-mathematician/SKILL.md`。
+- **任意能读写仓库的 coding agent**：读取 `AGENTS.md`、
+  `.agents/skills/co-mathematician/SKILL.md` 和 `agents/roles/`。
+- **Codex adapter**：额外使用 `.codex/config.toml` 和 `.codex/agents/*.toml`。
 - **Claude Code**：打开仓库，让 Claude Code 读取 `CLAUDE.md`、`AGENTS.md`
-  和 `agents/roles/`。
+  `agents/roles/` 和 `.claude/agents/`。
 - **Cursor**：打开仓库，使用 `.cursor/rules/` 中的项目规则。
 - **OpenCode + DeepSeek 或其他 provider**：先配置好模型 provider，再打开这个仓库。
   不要把 API key 写入仓库文件。
@@ -307,7 +309,8 @@ agents/roles/       canonical, platform-neutral role cards
 
 | Coding agent | 优先读取 | Native adapter |
 | --- | --- | --- |
-| Codex | `AGENTS.md`、`.agents/skills/co-mathematician/SKILL.md`、`agents/roles/` | `.codex/config.toml`、`.codex/agents/*.toml` |
+| Generic repository-aware agent | `AGENTS.md`、`.agents/skills/co-mathematician/SKILL.md`、`agents/roles/` | 不需要 native adapter |
+| Codex | 同上 generic files | `.codex/config.toml`、`.codex/agents/*.toml` |
 | Claude Code | `CLAUDE.md`、`AGENTS.md`、`agents/roles/` | `.claude/agents/*.md` |
 | Cursor | `.cursor/rules/co-mathematician.mdc`、`.cursor/rules/co-mathematician-roles.mdc`、`agents/roles/` | Cursor project rules 和 focused Agent sessions |
 

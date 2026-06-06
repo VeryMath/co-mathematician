@@ -6,15 +6,14 @@ description: Use when conducting a coding-agent-driven mathematical research pro
 # Co-Mathematician
 
 Use this skill to run mathematical research as a stateful coding-agent workspace.
-Codex, Claude Code, Cursor, or another repository-aware coding agent remains the
-driver; do not implement a new platform. The harness is only for state, schema,
-gates, report skeletons, and validation.
+The repository-aware coding agent remains the driver; do not implement a new
+platform. The harness is only for state, schema, gates, report skeletons, and
+validation.
 
 ## Agent Model
 
-- In Codex, the Codex main thread is the Project Coordinator.
-- In Claude Code, the main Claude Code conversation is the Project Coordinator.
-- In Cursor, the active Agent chat/session is the Project Coordinator.
+- The active main conversation/session in the chosen coding agent is the Project Coordinator.
+- Platform examples: Codex main thread, Claude Code main conversation, Cursor active Agent chat/session.
 - The repository filesystem is the shared artifact store.
 - Project-local skills under `.agents/skills/` are the default skill environment.
 - `agents/roles/` is the canonical role layer.

@@ -3,9 +3,10 @@
 > English | [中文](README.zh-CN.md)
 
 Co-Mathematician is a lightweight research workspace for using a repository-aware
-coding agent as an AI co-mathematician. It is designed to be cloned, opened in
-Codex, Claude Code, Cursor, OpenCode, or another coding agent, and used as a
-stateful mathematical research environment.
+coding agent as an AI co-mathematician. It is designed to be cloned, opened in a
+repository-aware coding agent, and used as a stateful mathematical research
+environment. Codex, Claude Code, Cursor, OpenCode, and similar tools are
+adapters to the same workspace protocol.
 
 The core formula is:
 
@@ -41,7 +42,7 @@ If your coding agent can run shell commands, start with:
 
 ```text
 Please clone this repository:
-https://github.com/ConanXu-math/co-mathematician
+https://github.com/VeryMath/co-mathematician
 
 Open it as the current workspace, install the local harness, and initialize
 `workspace/`. After that, start Co-Mathematician onboarding.
@@ -53,7 +54,7 @@ Do not start any mathematical workstream yet.
 Clone the repository:
 
 ```bash
-git clone https://github.com/ConanXu-math/co-mathematician.git
+git clone https://github.com/VeryMath/co-mathematician.git
 cd co-mathematician
 ```
 
@@ -74,10 +75,11 @@ Then open this folder in your coding agent.
 
 Suggested options:
 
-- **Codex**: open this repository as the working directory and ask Codex to use
-  `.agents/skills/co-mathematician/SKILL.md`.
+- **Any repository-aware coding agent**: read `AGENTS.md`,
+  `.agents/skills/co-mathematician/SKILL.md`, and `agents/roles/`.
+- **Codex adapter**: also use `.codex/config.toml` and `.codex/agents/*.toml`.
 - **Claude Code**: open this repository and let Claude Code read `CLAUDE.md`,
-  `AGENTS.md`, and `agents/roles/`.
+  `AGENTS.md`, `agents/roles/`, and `.claude/agents/`.
 - **Cursor**: open this repository and use the rules in `.cursor/rules/`.
 - **OpenCode + DeepSeek or another provider**: configure your model provider
   first, then open this repository. Never paste API keys into repo files.
@@ -312,7 +314,8 @@ agents/roles/       canonical, platform-neutral role cards
 
 | Coding agent | Reads first | Native adapter |
 | --- | --- | --- |
-| Codex | `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, `agents/roles/` | `.codex/config.toml`, `.codex/agents/*.toml` |
+| Generic repository-aware agent | `AGENTS.md`, `.agents/skills/co-mathematician/SKILL.md`, `agents/roles/` | no native adapter required |
+| Codex | same generic files | `.codex/config.toml`, `.codex/agents/*.toml` |
 | Claude Code | `CLAUDE.md`, `AGENTS.md`, `agents/roles/` | `.claude/agents/*.md` |
 | Cursor | `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, `agents/roles/` | Cursor project rules and focused Agent sessions |
 
