@@ -8,6 +8,7 @@ from .gating import check_gate
 from .messages import append_message
 from .reports import render_final
 from .schemas import VALID_MESSAGE_TYPES, VALID_WORKSTREAM_KINDS
+from .skills import refresh_skill_registry, suggest_skills
 from .workspace import init_workspace, new_workstream
 
 
@@ -61,6 +62,31 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser = subparsers.add_parser("render-final", help="Render final working paper")
     render_parser.add_argument("--workspace", default="workspace")
     render_parser.set_defaults(func=_cmd_render_final)
+
+    refresh_skills_parser = subparsers.add_parser(
+        "refresh-skills",
+        help="Scan project-local skills and write workspace skill registry",
+    )
+    refresh_skills_parser.add_argument("--workspace", default="workspace")
+    refresh_skills_parser.add_argument("--repo-root", default=".")
+    refresh_skills_parser.add_argument("--json", action="store_true")
+    refresh_skills_parser.set_defaults(func=_cmd_refresh_skills)
+
+    suggest_skills_parser = subparsers.add_parser(
+        "suggest-skills",
+        help="Suggest project-local skills for a query",
+    )
+    suggest_skills_parser.add_argument("--workspace", default="workspace")
+    suggest_skills_parser.add_argument("--repo-root", default=".")
+    suggest_skills_parser.add_argument("--query", required=True)
+    suggest_skills_parser.add_argument("--limit", type=int, default=5)
+    suggest_skills_parser.add_argument(
+        "--no-refresh",
+        action="store_true",
+        help="Use the existing registry instead of scanning project-local skills first",
+    )
+    suggest_skills_parser.add_argument("--json", action="store_true")
+    suggest_skills_parser.set_defaults(func=_cmd_suggest_skills)
 
     return parser
 
@@ -126,6 +152,39 @@ def _cmd_check_gate(args: argparse.Namespace) -> int:
 def _cmd_render_final(args: argparse.Namespace) -> int:
     path = render_final(args.workspace)
     print(f"Rendered final working paper: {path}")
+    return 0
+
+
+def _cmd_refresh_skills(args: argparse.Namespace) -> int:
+    registry = refresh_skill_registry(args.workspace, repo_root=args.repo_root)
+    if args.json:
+        print(json.dumps(registry, ensure_ascii=False, indent=2))
+        return 0
+    print(
+        "Refreshed project skill registry: "
+        f"{Path(args.workspace) / 'project' / 'skill_registry.json'}"
+    )
+    for skill in registry["skills"]:
+        print(f"- {skill['name']}: {skill['path']}")
+    return 0
+
+
+def _cmd_suggest_skills(args: argparse.Namespace) -> int:
+    matches = suggest_skills(
+        args.workspace,
+        args.query,
+        repo_root=args.repo_root,
+        refresh=not args.no_refresh,
+        limit=args.limit,
+    )
+    if args.json:
+        print(json.dumps(matches, ensure_ascii=False, indent=2))
+        return 0
+    if not matches:
+        print("No matching project-local skills found.")
+        return 1
+    for match in matches:
+        print(f"{match['name']} ({match['score']}): {match['path']}")
     return 0
 
 

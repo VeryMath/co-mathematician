@@ -49,6 +49,24 @@ the user explicitly asks for a personal installation shared across projects.
 Do not assume that a global skill install is visible to every coding agent or
 collaborator who opens this repository.
 
+Refresh the project-local skill registry at session start, after installing or
+copying skills, and before formalizing goals:
+
+```bash
+PYTHONPATH=. python3 -m harness.co_math.cli refresh-skills --workspace workspace
+```
+
+Before proposing goals or creating a workstream, match the scope against the
+registry:
+
+```bash
+PYTHONPATH=. python3 -m harness.co_math.cli suggest-skills --workspace workspace --query "..."
+```
+
+If a relevant project-local skill is suggested, read its `SKILL.md` before
+planning the goal or workstream. This is a workspace-level discovery contract; it
+does not replace the coding agent's native skill registry.
+
 ## Non-Negotiable Flow
 
 ```text
@@ -133,7 +151,7 @@ Each message must include:
 }
 ```
 
-Use message types: `status`, `instruction`, `question`, `decision`, `artifact`, `review`, `failure`.
+Use message types: `status`, `instruction`, `question`, `proposal`, `decision`, `artifact`, `review`, `failure`.
 
 ## Provenance And Uncertainty
 
