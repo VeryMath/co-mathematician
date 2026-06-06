@@ -88,6 +88,25 @@ Without installing the package, use:
 PYTHONPATH=. python3 -m harness.co_math.cli --help
 ```
 
+### Project-local skills
+
+For AI4Math skill libraries and project-specific research workflows, install
+skills into this repository by default:
+
+```text
+.agents/skills/
+```
+
+Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when
+you intentionally want a personal installation shared across projects.
+
+For example, to bring a local AI4Math skill library into this workspace:
+
+```bash
+mkdir -p .agents/skills
+rsync -a /path/to/AI4Math-Skill-Library/skills/ .agents/skills/
+```
+
 ## First Interaction
 
 After opening the repository in your coding agent, start with a prompt like:

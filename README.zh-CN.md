@@ -86,6 +86,25 @@ co-math init --workspace workspace
 PYTHONPATH=. python3 -m harness.co_math.cli --help
 ```
 
+### 项目级 Skills
+
+为了兼容 AI4Math 的大量 skill libraries 和项目特定研究流程，默认把 skills
+安装或复制到当前仓库：
+
+```text
+.agents/skills/
+```
+
+只有当你明确想要“跨项目共享的个人安装”时，才使用 `~/.codex/skills` 或
+`~/.agents/skills` 这样的全局 skill root。
+
+例如，把本地 AI4Math skill library 放进这个工作区：
+
+```bash
+mkdir -p .agents/skills
+rsync -a /path/to/AI4Math-Skill-Library/skills/ .agents/skills/
+```
+
 ## 第一次交互
 
 在 coding agent 中打开仓库后，可以用类似这样的第一条 prompt：

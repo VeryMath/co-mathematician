@@ -10,6 +10,7 @@ The coding agent is the driver:
 - In Claude Code, the main Claude Code conversation is the Project Coordinator.
 - In Cursor, the active Agent chat/session is the Project Coordinator.
 - The repository filesystem is the shared artifact store.
+- Project-local skills under `.agents/skills/` are the default skill environment.
 - `agents/roles/` is the canonical role layer.
 - `.codex/agents/`, `.claude/agents/`, and `.cursor/rules/` are platform adapters.
 - Native subagents, task agents, Cursor Agent sessions, or separate reviewer passes are workstream coordinators, specialized agents, and reviewers.
@@ -35,6 +36,8 @@ The coding agent is the driver:
 This workspace is intended to work after cloning in Codex, Claude Code, Cursor,
 or another repository-aware coding agent.
 
+- Install or copy additional project-specific skills into `.agents/skills/` by default.
+- Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when the user explicitly wants a personal installation shared across projects.
 - Codex should read `AGENTS.md`, `agents/roles/`, `.codex/config.toml`, and `.codex/agents/`.
 - Claude Code should read `CLAUDE.md`, `agents/roles/`, and `.claude/agents/`.
 - Cursor should read `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, and `agents/roles/`.

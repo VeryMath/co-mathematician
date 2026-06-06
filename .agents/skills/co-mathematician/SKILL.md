@@ -16,6 +16,7 @@ gates, report skeletons, and validation.
 - In Claude Code, the main Claude Code conversation is the Project Coordinator.
 - In Cursor, the active Agent chat/session is the Project Coordinator.
 - The repository filesystem is the shared artifact store.
+- Project-local skills under `.agents/skills/` are the default skill environment.
 - `agents/roles/` is the canonical role layer.
 - `.codex/agents/`, `.claude/agents/`, and `.cursor/rules/` are platform adapters.
 - Native subagents, task agents, Cursor Agent sessions, or separate reviewer passes are workstream coordinators, specialized agents, and reviewers.
@@ -36,6 +37,17 @@ agents/roles/       canonical role cards
 
 Adapters must not approve goals, start unapproved workstreams, mark workstreams
 complete, or let a report author approve their own report.
+
+## Project-Local Skill Environment
+
+Install or copy additional research skills into this repository's
+`.agents/skills/` directory by default. This keeps AI4Math skill libraries and
+project-specific research workflows portable with the workspace.
+
+Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when
+the user explicitly asks for a personal installation shared across projects.
+Do not assume that a global skill install is visible to every coding agent or
+collaborator who opens this repository.
 
 ## Non-Negotiable Flow
 
