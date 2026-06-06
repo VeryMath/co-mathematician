@@ -59,3 +59,18 @@ def test_append_message_writes_jsonl_records(tmp_path):
     raw_line = (workspace / "project" / "messages.jsonl").read_text().strip()
     assert json.loads(raw_line) == record
     assert read_messages(workspace) == [record]
+
+
+def test_append_message_accepts_goal_proposal_records(tmp_path):
+    workspace = tmp_path / "workspace"
+    init_workspace(workspace)
+
+    record = append_message(
+        workspace,
+        sender="project_coordinator",
+        recipient="user",
+        message_type="proposal",
+        content="Proposed goals G1-G3 and await user approval.",
+    )
+
+    assert record["type"] == "proposal"

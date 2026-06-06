@@ -22,6 +22,8 @@ The coding agent is the driver:
 
 - Always run onboarding before goal approval.
 - During onboarding, ask the user to choose a workspace document language policy.
+- Refresh the project-local skill registry at session start, after skill installation, and before formalizing goals.
+- Before creating any workstream, match the workstream scope against the project-local skill registry and read any relevant `SKILL.md`.
 - Always get explicit user approval of goals before starting any workstream.
 - Never start a workstream for an unapproved goal.
 - Important claims must include provenance.
@@ -38,6 +40,8 @@ or another repository-aware coding agent.
 
 - Install or copy additional project-specific skills into `.agents/skills/` by default.
 - Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when the user explicitly wants a personal installation shared across projects.
+- Use `co-math refresh-skills --workspace workspace` to write `workspace/project/skill_registry.json` and `workspace/project/SKILL_REGISTRY.md`.
+- Use `co-math suggest-skills --workspace workspace --query "..."` before goal formalization and workstream creation.
 - Codex should read `AGENTS.md`, `agents/roles/`, `.codex/config.toml`, and `.codex/agents/`.
 - Claude Code should read `CLAUDE.md`, `agents/roles/`, and `.claude/agents/`.
 - Cursor should read `.cursor/rules/co-mathematician.mdc`, `.cursor/rules/co-mathematician-roles.mdc`, and `agents/roles/`.

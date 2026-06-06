@@ -95,6 +95,9 @@ PYTHONPATH=. python3 -m harness.co_math.cli --help
 .agents/skills/
 ```
 
+registry scanner 会发现 `.agents/skills/<skill>/SKILL.md`，也会发现类似
+`.agents/skills/<category>/<skill>/SKILL.md` 的嵌套布局。
+
 只有当你明确想要“跨项目共享的个人安装”时，才使用 `~/.codex/skills` 或
 `~/.agents/skills` 这样的全局 skill root。
 
@@ -103,7 +106,14 @@ PYTHONPATH=. python3 -m harness.co_math.cli --help
 ```bash
 mkdir -p .agents/skills
 rsync -a /path/to/AI4Math-Skill-Library/skills/ .agents/skills/
+co-math refresh-skills --workspace workspace
+co-math suggest-skills --workspace workspace --query "Stiefel manifold optimization"
 ```
+
+`suggest-skills` 默认会先刷新项目级 registry，所以即使 coding agent 的原生 skill
+registry 还没重新加载，新复制进来的 skills 也会被工作区看见。如果它推荐了相关
+skill，就要求 Project Coordinator 在提出 goals 或创建 workstream 前先阅读对应的
+`SKILL.md`。
 
 ## 第一次交互
 
@@ -112,7 +122,7 @@ rsync -a /path/to/AI4Math-Skill-Library/skills/ .agents/skills/
 ```text
 我想用这个仓库启动一个 Co-Mathematician 数学研究项目。
 
-请先检查工作区状态，然后带我完成 onboarding。
+请先检查工作区状态，刷新项目级 skill registry，然后带我完成 onboarding。
 现在不要开始具体研究。
 ```
 
@@ -275,6 +285,8 @@ flowchart TD
 
 ```bash
 co-math init --workspace workspace
+co-math refresh-skills --workspace workspace
+co-math suggest-skills --workspace workspace --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
 co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1

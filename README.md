@@ -97,6 +97,9 @@ skills into this repository by default:
 .agents/skills/
 ```
 
+The registry scanner discovers both `.agents/skills/<skill>/SKILL.md` and nested
+layouts such as `.agents/skills/<category>/<skill>/SKILL.md`.
+
 Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when
 you intentionally want a personal installation shared across projects.
 
@@ -105,23 +108,26 @@ For example, to bring a local AI4Math skill library into this workspace:
 ```bash
 mkdir -p .agents/skills
 rsync -a /path/to/AI4Math-Skill-Library/skills/ .agents/skills/
+co-math refresh-skills --workspace workspace
+co-math suggest-skills --workspace workspace --query "Stiefel manifold optimization"
 ```
+
+`suggest-skills` refreshes the project-local registry by default, so newly copied
+skills are visible to the workspace even when the coding agent's native skill
+registry has not reloaded yet. If it suggests a relevant skill, ask the Project
+Coordinator to read that `SKILL.md` before proposing goals or creating a
+workstream.
 
 ## First Interaction
 
 After opening the repository in your coding agent, start with a prompt like:
 
 ```text
-Use this repository as a Co-Mathematician research workspace.
-You are the Project Coordinator.
+I want to start a Co-Mathematician research project with this repository.
 
-First read AGENTS.md and the co-mathematician Skill.
-Initialize the workspace if needed, then start onboarding.
-First ask me to choose the workspace document language policy.
-
-Do not solve the math problem yet.
-Do not create any workstream until I explicitly approve goals.
-Do not mark anything complete until reviewer gates pass.
+Please check the workspace state first, refresh the project-local skill registry,
+and guide me through onboarding.
+Do not start concrete research yet.
 ```
 
 The first onboarding choice should be the workspace document language policy:
@@ -284,6 +290,8 @@ flowchart TD
 
 ```bash
 co-math init --workspace workspace
+co-math refresh-skills --workspace workspace
+co-math suggest-skills --workspace workspace --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
 co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
