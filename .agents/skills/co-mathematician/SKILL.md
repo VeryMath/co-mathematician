@@ -66,14 +66,51 @@ If a relevant project-local skill is suggested, read its `SKILL.md` before
 planning the goal or workstream. This is a workspace-level discovery contract; it
 does not replace the coding agent's native skill registry.
 
-## Non-Negotiable Flow
+## Workflow Modes
+
+### Workspace Mode
+
+Use the full Co-Mathematician sequence when no project-local domain Skill is
+driving the task:
 
 ```text
 onboarding -> research question formalization -> goal approval -> workstreams -> reviewer loop -> final working paper
 ```
 
+### Skill-Guided Mode
+
+Use this when the user explicitly invokes a project-local Skill, or accepts a
+Skill suggested by `co-math suggest-skills`. The domain Skill controls the inner
+workflow: opening question, modeling route, approval rules, execution plan, and
+domain-specific artifacts.
+
+Record the handoff:
+
+```bash
+PYTHONPATH=. python3 -m harness.co_math.cli skill-handoff \
+  --workspace workspace \
+  --skill optimization-skill \
+  --mode skill_guided \
+  --reason "ODL is a Stiefel manifold optimization problem." \
+  --query "orthogonal dictionary learning Stiefel optimization" \
+  --skill-path ".agents/skills/optimization-skill/SKILL.md"
+```
+
+In skill-guided mode, do not force the default onboarding-goal-workstream
+sequence before the domain Skill's own first response or modeling checkpoint.
+Promote the task to approved goals and workstreams only when the user wants
+durable research output, reviewer-gated claims, or a final working paper.
+
+### Quick Skill Mode
+
+Use this for a small one-off Skill task. Record it with `--mode quick_skill`.
+No workstream is required unless the user later promotes it into a research
+project.
+
+## Non-Negotiable Boundaries
+
 - Do not solve the math problem during onboarding.
-- Ask the user to choose a workspace document language policy during onboarding.
+- Ask the user to choose a workspace document language policy during workspace-mode onboarding.
 - Do not start a workstream until the user explicitly approves a goal.
 - Do not mark a workstream complete until an independent reviewer approves its report.
 - Do not hide uncertainty, failed attempts, or missing provenance.
@@ -106,6 +143,10 @@ commands stay in English.
 ## Research Question And Goals
 
 Write a formal research question and proposed goals in `workspace/project/GOALS.yaml`. Goals begin as drafts. Ask the user to approve or revise them. Only goals with `status: approved` may receive workstreams.
+
+In skill-guided mode, let the domain Skill collect or model the task first when
+its workflow requires that. Then summarize the result into goals only if the
+user wants to promote the Skill task into a durable research workstream.
 
 Use:
 

@@ -16,6 +16,7 @@ def test_init_creates_workspace_scaffold_and_is_idempotent(tmp_path):
     assert (workspace / "project" / "GOALS.yaml").is_file()
     assert (workspace / "project" / "PROJECT_STATUS.md").is_file()
     assert (workspace / "project" / "messages.jsonl").is_file()
+    assert (workspace / "project" / "skill_handoffs.jsonl").is_file()
     assert (workspace / "workstreams").is_dir()
     assert (workspace / "final").is_dir()
 

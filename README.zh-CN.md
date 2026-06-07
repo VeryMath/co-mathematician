@@ -117,6 +117,22 @@ registry 还没重新加载，新复制进来的 skills 也会被工作区看见
 skill，就要求 Project Coordinator 在提出 goals 或创建 workstream 前先阅读对应的
 `SKILL.md`。
 
+如果用户决定让这个 Skill 接管内部任务流程，就记录 handoff：
+
+```bash
+co-math skill-handoff \
+  --workspace workspace \
+  --skill optimization-skill \
+  --mode skill_guided \
+  --reason "The task is an optimization modeling problem." \
+  --query "Stiefel manifold optimization" \
+  --skill-path ".agents/skills/optimization-skill/SKILL.md"
+```
+
+handoff 之后，内部步骤按 domain Skill 自己的流程走。只有当用户希望把任务提升为
+durable research output 或 final working paper 时，才进入完整的
+goal/workstream/reviewer 流程。
+
 ## 第一次交互
 
 在 coding agent 中打开仓库后，可以用类似这样的第一条 prompt：
@@ -154,6 +170,11 @@ onboarding 开始后，再把问题背景给 agent：
 请先 formalize research question，并提出 proposed goals。
 现在不要创建 workstreams。
 ```
+
+如果用户明确调用了某个 domain Skill，也可以进入 skill-guided mode。此时下一步
+由该 Skill 自己的 opening、modeling 和 approval rules 控制；Co-Mathematician
+只记录 handoff，并在任务被提升为研究项目时继续提供 provenance、uncertainty、
+failures 和 final-paper gates。
 
 Project Coordinator 应更新：
 
@@ -289,6 +310,7 @@ flowchart TD
 co-math init --workspace workspace
 co-math refresh-skills --workspace workspace
 co-math suggest-skills --workspace workspace --query "..."
+co-math skill-handoff --workspace workspace --skill optimization-skill --mode skill_guided --reason "..." --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
 co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1

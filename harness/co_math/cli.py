@@ -7,7 +7,12 @@ from pathlib import Path
 from .gating import check_gate
 from .messages import append_message
 from .reports import render_final
-from .schemas import VALID_MESSAGE_TYPES, VALID_WORKSTREAM_KINDS
+from .schemas import (
+    VALID_MESSAGE_TYPES,
+    VALID_SKILL_HANDOFF_MODES,
+    VALID_WORKSTREAM_KINDS,
+)
+from .skill_handoff import record_skill_handoff
 from .skills import refresh_skill_registry, suggest_skills
 from .workspace import init_workspace, new_workstream
 
@@ -87,6 +92,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     suggest_skills_parser.add_argument("--json", action="store_true")
     suggest_skills_parser.set_defaults(func=_cmd_suggest_skills)
+
+    handoff_parser = subparsers.add_parser(
+        "skill-handoff",
+        help="Record that inner workflow control is delegated to a project-local skill",
+    )
+    handoff_parser.add_argument("--workspace", default="workspace")
+    handoff_parser.add_argument("--skill", required=True)
+    handoff_parser.add_argument("--mode", choices=VALID_SKILL_HANDOFF_MODES, required=True)
+    handoff_parser.add_argument("--reason", required=True)
+    handoff_parser.add_argument("--query", default="")
+    handoff_parser.add_argument("--skill-path", default="")
+    handoff_parser.add_argument("--status", default="active")
+    handoff_parser.add_argument("--json", action="store_true")
+    handoff_parser.set_defaults(func=_cmd_skill_handoff)
 
     return parser
 
@@ -185,6 +204,27 @@ def _cmd_suggest_skills(args: argparse.Namespace) -> int:
         return 1
     for match in matches:
         print(f"{match['name']} ({match['score']}): {match['path']}")
+    return 0
+
+
+def _cmd_skill_handoff(args: argparse.Namespace) -> int:
+    record = record_skill_handoff(
+        args.workspace,
+        skill=args.skill,
+        mode=args.mode,
+        reason=args.reason,
+        query=args.query,
+        skill_path=args.skill_path,
+        status=args.status,
+    )
+    if args.json:
+        print(json.dumps(record, ensure_ascii=False, indent=2))
+        return 0
+    print(
+        "Recorded skill handoff: "
+        f"{record['skill']} ({record['mode']}) -> "
+        f"{Path(args.workspace) / 'project' / 'skill_handoffs.jsonl'}"
+    )
     return 0
 
 

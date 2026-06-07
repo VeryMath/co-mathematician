@@ -120,6 +120,22 @@ registry has not reloaded yet. If it suggests a relevant skill, ask the Project
 Coordinator to read that `SKILL.md` before proposing goals or creating a
 workstream.
 
+If the user chooses to let that Skill drive the task, record a handoff:
+
+```bash
+co-math skill-handoff \
+  --workspace workspace \
+  --skill optimization-skill \
+  --mode skill_guided \
+  --reason "The task is an optimization modeling problem." \
+  --query "Stiefel manifold optimization" \
+  --skill-path ".agents/skills/optimization-skill/SKILL.md"
+```
+
+After handoff, follow the domain Skill's workflow for the inner task. Use the
+full goal/workstream/reviewer flow only when the user wants durable research
+output or a final working paper.
+
 ## First Interaction
 
 After opening the repository in your coding agent, start with a prompt like:
@@ -158,6 +174,12 @@ Relevant references or files:
 Please formalize the research question and propose goals.
 Do not create workstreams yet.
 ```
+
+If a domain Skill is explicitly invoked, the interaction may enter
+skill-guided mode instead. In that case, the Skill's own opening, modeling, and
+approval rules control the next steps. Co-Mathematician records the handoff and
+keeps provenance, uncertainty, failures, and final-paper gates available when
+the user promotes the task into a research project.
 
 The Project Coordinator should update:
 
@@ -294,6 +316,7 @@ flowchart TD
 co-math init --workspace workspace
 co-math refresh-skills --workspace workspace
 co-math suggest-skills --workspace workspace --query "..."
+co-math skill-handoff --workspace workspace --skill optimization-skill --mode skill_guided --reason "..." --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
 co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1

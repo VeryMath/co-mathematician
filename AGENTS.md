@@ -19,7 +19,10 @@ The coding agent is the driver:
 
 ## Hard Rules
 
-- Always run onboarding before goal approval.
+- Default workspace mode uses onboarding before goal approval.
+- If the user explicitly invokes a project-local domain Skill, or accepts a suggested Skill, enter skill-guided mode and follow that Skill's workflow for the inner task.
+- In skill-guided mode, record the handoff with `co-math skill-handoff`; do not force the default onboarding-goal-workstream sequence before the domain Skill's own opening or modeling flow.
+- A quick Skill task may stay outside workstreams unless the user wants durable research output, a final working paper, or reviewer-gated claims.
 - During onboarding, ask the user to choose a workspace document language policy.
 - Refresh the project-local skill registry at session start, after skill installation, and before formalizing goals.
 - Before creating any workstream, match the workstream scope against the project-local skill registry and read any relevant `SKILL.md`.
@@ -42,6 +45,7 @@ agent.
 - Use global skill roots such as `~/.codex/skills` or `~/.agents/skills` only when the user explicitly wants a personal installation shared across projects.
 - Use `co-math refresh-skills --workspace workspace` to write `workspace/project/skill_registry.json` and `workspace/project/SKILL_REGISTRY.md`.
 - Use `co-math suggest-skills --workspace workspace --query "..."` before goal formalization and workstream creation.
+- Use `co-math skill-handoff --workspace workspace --skill <name> --mode skill_guided --reason "..."` when a domain Skill takes over the inner workflow.
 - Codex may also use `.codex/config.toml` and `.codex/agents/`.
 - Claude Code may also use `CLAUDE.md` and `.claude/agents/`.
 - Cursor may also use `.cursor/rules/co-mathematician.mdc` and `.cursor/rules/co-mathematician-roles.mdc`.
@@ -96,6 +100,7 @@ workspace/
     GOALS.yaml
     PROJECT_STATUS.md
     messages.jsonl
+    skill_handoffs.jsonl
   workstreams/
   final/
 ```

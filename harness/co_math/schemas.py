@@ -15,6 +15,7 @@ MessageType = Literal[
     "failure",
 ]
 WorkstreamKind = Literal["proof", "computation", "literature", "review"]
+SkillHandoffMode = Literal["skill_guided", "quick_skill"]
 
 VALID_MESSAGE_TYPES: tuple[str, ...] = (
     "status",
@@ -32,6 +33,7 @@ VALID_WORKSTREAM_KINDS: tuple[str, ...] = (
     "literature",
     "review",
 )
+VALID_SKILL_HANDOFF_MODES: tuple[str, ...] = ("skill_guided", "quick_skill")
 
 
 class MessageRecord(TypedDict):
@@ -42,6 +44,16 @@ class MessageRecord(TypedDict):
     content: str
     provenance: list[str]
     uncertainty: list[str]
+
+
+class SkillHandoffRecord(TypedDict):
+    timestamp: str
+    skill: str
+    mode: str
+    status: str
+    reason: str
+    query: str
+    skill_path: str
 
 
 @dataclass(frozen=True)

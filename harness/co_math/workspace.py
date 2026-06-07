@@ -35,7 +35,10 @@ before writing project content:
 4. Match each project or conversation.
 
 ## Operating Rule
-Do not start workstreams until the user approves explicit goals in GOALS.yaml.
+Default workspace mode does not start workstreams until the user approves
+explicit goals in GOALS.yaml. If a project-local domain Skill is active, record
+the handoff and follow that Skill's workflow until the task is promoted into
+goals or workstreams.
 """
 
 DEFAULT_GOALS = {
@@ -57,6 +60,7 @@ DEFAULT_PROJECT_STATUS = """# Project Status
 - language_policy: pending_user_choice
 - approved_goals: 0
 - active_workstreams: 0
+- active_skill_handoffs: 0
 - final_output: not_started
 
 No mathematical research project has started.
@@ -77,6 +81,7 @@ def init_workspace(workspace: str | Path) -> Path:
     _write_yaml_if_missing(project / "GOALS.yaml", DEFAULT_GOALS)
     _write_text_if_missing(project / "PROJECT_STATUS.md", DEFAULT_PROJECT_STATUS)
     (project / "messages.jsonl").touch(exist_ok=True)
+    (project / "skill_handoffs.jsonl").touch(exist_ok=True)
     return root
 
 
