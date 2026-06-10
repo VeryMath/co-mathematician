@@ -60,6 +60,9 @@ tmp/
 temp/
 .cache/
 
+# Local workspace review artifacts
+workspace/project/*_REVIEW.md
+
 # Local-only examples and demos.
 examples/
 
