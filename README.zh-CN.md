@@ -1,6 +1,16 @@
-# Co-Mathematician Workspace
+<div align="center">
 
-> [English](README.md) | 中文
+# Co-Mathematician
+
+面向 coding agent 的仓库化数学研究工作区。
+
+[English](README.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [架构](#这个工作区能做什么)
+
+![version](https://img.shields.io/badge/version-0.1.0-blue)
+![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+</div>
 
 <p align="center">
   <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
