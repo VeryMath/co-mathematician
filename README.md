@@ -1,6 +1,16 @@
-# Co-Mathematician Workspace
+<div align="center">
 
-> English | [中文](README.zh-CN.md)
+# Co-Mathematician
+
+A repository-backed mathematical research workspace for coding agents.
+
+[中文说明](README.zh-CN.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Architecture](#what-this-workspace-does)
+
+![version](https://img.shields.io/badge/version-0.1.0-blue)
+![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+</div>
 
 <p align="center">
   <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
