@@ -48,19 +48,26 @@ working paper.
 
 ## Install And Open The Workspace
 
-You can set up the workspace manually, or ask your coding agent to do it.
+The recommended path is AI-assisted workspace setup. You can also set it up
+manually.
 
-### Agent-led setup
+### AI-Assisted Workspace Setup
 
 If your coding agent can run shell commands, start with:
 
 ```text
-Please clone this repository:
-https://github.com/VeryMath/co-mathematician
+Please set up Co-Mathematician for me.
 
-Open it as the current workspace, install the local harness, and initialize
-`workspace/`. After that, start Co-Mathematician onboarding.
-Do not start any mathematical workstream yet.
+Repository: https://github.com/VeryMath/co-mathematician.git
+Branch: main
+
+Steps:
+1. Clone or update the repository locally.
+2. Open it as the current workspace.
+3. Read README.md, AGENTS.md, and the workspace protocol files.
+4. Install the local harness and initialize `workspace/`.
+5. Start Co-Mathematician onboarding.
+6. Do not start any mathematical workstream yet.
 ```
 
 ### Manual setup

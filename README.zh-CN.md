@@ -46,19 +46,25 @@ workstreams、检查 gates、渲染 final working paper。
 
 ## 安装并打开工作区
 
-你可以手动安装，也可以让 coding agent 帮你完成拉取和初始化。
+推荐方式是 AI 自动完成 workspace setup；你也可以手动安装。
 
-### Agent-led setup
+### AI 自动 workspace setup
 
 如果你的 coding agent 可以运行 shell 命令，可以先这样说：
 
 ```text
-请你拉取这个仓库：
-https://github.com/VeryMath/co-mathematician
+请帮我设置 Co-Mathematician。
 
-把它作为当前工作区打开，安装本地 harness，并初始化 `workspace/`。
-完成后开始 Co-Mathematician onboarding。
-不要启动任何数学 workstream。
+仓库：https://github.com/VeryMath/co-mathematician.git
+分支：main
+
+请执行：
+1. 本地 clone 或更新仓库。
+2. 把它作为当前工作区打开。
+3. 读取 README.md、AGENTS.md 和 workspace protocol 文件。
+4. 安装本地 harness，并初始化 `workspace/`。
+5. 开始 Co-Mathematician onboarding。
+6. 不要启动任何数学 workstream。
 ```
 
 ### 手动安装
