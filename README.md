@@ -4,7 +4,7 @@
 
 A repository-backed mathematical research workspace for coding agents.
 
-[中文说明](README.zh-CN.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Architecture](#what-this-workspace-does)
+[中文说明](README.zh-CN.md) · [Contributors](CONTRIBUTORS.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Architecture](#what-this-workspace-does)
 
 ![version](https://img.shields.io/badge/version-0.1.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)

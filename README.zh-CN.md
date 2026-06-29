@@ -4,7 +4,7 @@
 
 面向 coding agent 的仓库化数学研究工作区。
 
-[English](README.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [架构](#这个工作区能做什么)
+[English](README.md) · [贡献者](CONTRIBUTORS.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [架构](#这个工作区能做什么)
 
 ![version](https://img.shields.io/badge/version-0.1.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
