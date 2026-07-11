@@ -12,6 +12,10 @@ A repository-backed mathematical research workspace for coding agents.
 
 </div>
 
+<p align="center">
+  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
+</p>
+
 Co-Mathematician is a lightweight research workspace for using a repository-aware
 coding agent as an AI co-mathematician. It is designed to be cloned, opened in a
 repository-aware coding agent, and used as a stateful mathematical research
@@ -438,6 +442,7 @@ agents/roles/
 .codex/
 .claude/
 .cursor/
+docs/
 harness/co_math/
 workspace/
 ```

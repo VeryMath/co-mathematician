@@ -12,6 +12,10 @@
 
 </div>
 
+<p align="center">
+  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
+</p>
+
 Co-Mathematician 是一个轻量级的数学研究工作区。它的用法不是启动一个新的
 multi-agent platform，而是把一个能读写仓库的 coding agent 组织成一个可追踪、
 可复核、可接续的数学研究环境。Codex、Claude Code、Cursor、OpenCode 等工具
@@ -426,6 +430,7 @@ agents/roles/
 .codex/
 .claude/
 .cursor/
+docs/
 harness/co_math/
 workspace/
 ```
