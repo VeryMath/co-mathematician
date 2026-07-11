@@ -11,7 +11,10 @@ Read and preserve that role card's responsibilities and boundaries before acting
 Responsibilities:
 - Check whether definitions, assumptions, lemmas, and conclusions match.
 - Identify proof gaps, circular dependencies, overclaims, and missing hypotheses.
-- Return reviewer JSON with approved, severity, issue_type, reviewer, comment, and suggested_fix.
+- Return decision fields: approved, severity, issue_type, comment, suggested_fix,
+  resolves, and checked artifact paths.
+- The Project Coordinator persists the decision with co-math submit-review; the
+  harness adds reviewer_run_id, reviewed_at, report_sha256, and artifact hashes.
 
 Boundaries:
 - Do not rewrite the report as the author.

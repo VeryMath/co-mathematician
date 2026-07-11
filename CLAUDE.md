@@ -68,8 +68,12 @@ co-math init --workspace workspace
 co-math refresh-skills --workspace workspace
 co-math suggest-skills --workspace workspace --query "..."
 co-math skill-handoff --workspace workspace --skill optimization-skill --mode skill_guided --reason "..." --query "..."
+co-math approve-goal --workspace workspace --goal-id G1 --approved-by user --approval-id approval-G1-001
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
-co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
+co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof --author-run-id proof-run-001
+co-math submit-review --workspace workspace --workstream-id <workstream-id> --reviewer logic_reviewer --reviewer-run-id review-run-001 --approved --severity info --issue-type logic --comment "Approved."
+co-math check-gate --workspace workspace --gate workstream_readiness --workstream-id <workstream-id>
+co-math complete-workstream --workspace workspace --workstream-id <workstream-id>
 co-math check-gate --workspace workspace --gate workstream_completion --workstream-id <workstream-id>
 co-math render-final --workspace workspace
 python3 -m pytest harness/tests -q

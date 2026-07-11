@@ -34,6 +34,15 @@ VALID_WORKSTREAM_KINDS: tuple[str, ...] = (
     "review",
 )
 VALID_SKILL_HANDOFF_MODES: tuple[str, ...] = ("skill_guided", "quick_skill")
+VALID_REVIEW_SEVERITIES: tuple[str, ...] = ("info", "warning", "blocking")
+VALID_REVIEW_ISSUE_TYPES: tuple[str, ...] = (
+    "logic",
+    "citation",
+    "code",
+    "exposition",
+    "missing_provenance",
+    "uncertainty",
+)
 
 
 class MessageRecord(TypedDict):

@@ -32,3 +32,5 @@ def test_record_skill_guided_handoff_writes_durable_registry(tmp_path):
     assert "optimization-skill" in markdown
     assert "skill_guided" in markdown
     assert ".agents/skills/optimization-skill/SKILL.md" in markdown
+    project_status = (workspace / "project" / "PROJECT_STATUS.md").read_text()
+    assert "active_skill_handoffs: 1" in project_status

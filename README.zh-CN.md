@@ -4,17 +4,13 @@
 
 面向 coding agent 的仓库化数学研究工作区。
 
-[English](README.md) · [贡献者](CONTRIBUTORS.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [架构](#这个工作区能做什么)
+[English](README.md) · [贡献者](CONTRIBUTORS.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [版本更新](#版本更新) · [架构](#这个工作区能做什么)
 
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
-
-<p align="center">
-  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
-</p>
 
 Co-Mathematician 是一个轻量级的数学研究工作区。它的用法不是启动一个新的
 multi-agent platform，而是把一个能读写仓库的 coding agent 组织成一个可追踪、
@@ -39,10 +35,41 @@ Co-Mathematician 会把一次数学研究对话变成一个文件化项目：
 - `workspace/project/` 保存研究问题、目标、状态和消息
 - `workspace/workstreams/` 保存证明、计算、文献、审查等分支工作
 - reviewer agents 或独立 reviewer sessions 在完成前审查 report
-- `workspace/final/working_paper.md` 只从通过审查的 reports 渲染
+- completion 会冻结内容寻址的 reviewed report 与 review-evidence bundle
+- `workspace/final/generated_draft.md` 只从 reviewed snapshots 渲染
+- synthesis agent 可把 generated draft 改写为 `workspace/final/working_paper.md`
 
 Python harness 不运行 agents。它只负责初始化文件、追加 messages、创建已批准
-workstreams、检查 gates、渲染 final working paper。
+workstreams、记录 lifecycle、校验绑定报告哈希的 reviews、检查 gates 和生成 draft。
+
+### 信任边界
+
+harness 面向协作式 multi-agent workflow，防止 stale state、部分写入、路径逃逸，
+以及 report、review record 和显式声明的 checked artifact 漂移。completion
+manifest 会用 SHA-256 绑定 goal approval event、author run、reviewed report、完整
+review 集合和 declared checked artifacts。但它不是针对“已经拥有仓库
+任意写权限的恶意进程”的授权系统。生产级 adapter 应由宿主控制面签发 actor/run
+identity，不能把 CLI 传入的字符串当作密码学身份证明。
+
+## 版本更新
+
+### 0.2.0 (2026-07-11)
+
+- 将 `approve-goal`、`submit-review` 和 `complete-workstream` 强化为显式
+  lifecycle transitions，并加入 schema 校验、run ID、report SHA-256 绑定和
+  completion manifest
+- 增加 workspace lock、atomic writes、ID 校验和路径 containment 检查，支持
+  并发创建 workstream 与共享状态更新
+- 把 final rendering 拆成 reviewed `generated_draft.md` snapshots 和由
+  synthesis agent 负责的 `working_paper.md`
+- 新增 canonical `workstream_coordinator` 与 `literature_researcher` roles，
+  并同步 Codex、Claude Code、Cursor adapters
+- 明确协作式 trust boundary，并记录 review 时 checked artifacts 的 SHA-256
+
+### 0.1.0
+
+- 初始公开 workspace protocol：project files、approved goals、workstreams、
+  reviewer gates 和 platform adapters
 
 ## 安装并打开工作区
 
@@ -205,10 +232,14 @@ workspace/project/PROJECT_STATUS.md
 workspace/project/messages.jsonl
 ```
 
-draft goal 不可执行。只有当 goal 状态是下面这样，才能启动 workstream：
+draft goal 不可执行。用户在对话中明确批准后，使用唯一 approval event 记录：
 
-```yaml
-status: approved
+```bash
+co-math approve-goal \
+  --workspace workspace \
+  --goal-id G1 \
+  --approved-by user \
+  --approval-id approval-G1-001
 ```
 
 检查 goal gate：
@@ -248,7 +279,8 @@ co-math new-workstream \
   --workspace workspace \
   --goal-id G1 \
   --title "Literature baseline review" \
-  --kind literature
+  --kind literature \
+  --author-run-id literature-run-001
 ```
 
 允许的 workstream kind 是 `proof`、`computation`、`literature` 和 `review`。
@@ -260,18 +292,36 @@ co-math new-workstream \
 - failed explorations
 - `reviews/` 下的独立 reviewer output
 
-检查 completion：
+通过 CLI 提交 reviewer output。harness 会执行 schema 校验、绑定当前
+`report.md` 的 SHA-256，并拒绝 author run 自审：
 
 ```bash
-co-math check-gate \
+co-math submit-review \
   --workspace workspace \
-  --gate workstream_completion \
-  --workstream-id WS-G1-001-example
+  --workstream-id WS-G1-001-literature-baseline-review \
+  --reviewer logic_reviewer \
+  --reviewer-run-id logic-review-run-001 \
+  --approved \
+  --severity info \
+  --issue-type logic \
+  --comment "Approved."
 ```
 
-## 渲染 Working Paper
+如果 review 依赖代码、数据或计算输出，可重复传入
+`--checked-artifact artifacts/<file>`。路径相对当前 workstream；harness 会记录并在
+后续 gate 中复核这些文件的 SHA-256。
 
-当 workstream reports 通过独立审查后，渲染 final working paper：
+检查 readiness，冻结 reviewed snapshot，再检查 completion：
+
+```bash
+co-math check-gate --workspace workspace --gate workstream_readiness --workstream-id WS-G1-001-literature-baseline-review
+co-math complete-workstream --workspace workspace --workstream-id WS-G1-001-literature-baseline-review
+co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-literature-baseline-review
+```
+
+## 生成 Draft 与 Synthesis
+
+从不可变 reviewed snapshots 生成 draft：
 
 ```bash
 co-math render-final --workspace workspace
@@ -280,11 +330,11 @@ co-math render-final --workspace workspace
 输出位置是：
 
 ```text
-workspace/final/working_paper.md
+workspace/final/generated_draft.md
 ```
 
-这是 working paper，不是聊天总结。它应该保留 provenance、uncertainty、
-failed explorations 和 reviewer status。
+harness 不会覆盖 `workspace/final/working_paper.md`。该文件由 synthesis agent
+独占，可以在不引入未审查 claims 的前提下改写 generated draft。
 
 ## 工作区框架
 
@@ -316,12 +366,15 @@ flowchart TD
     Revision --> Workstreams
     ReviewGate -- "是" --> Complete["Workstream complete"]
 
-    Complete --> Final["final/working_paper.md"]
+    Complete --> Snapshot["reviewed/report-&lt;sha256&gt;.md"]
+    Snapshot --> Generated["final/generated_draft.md"]
+    Generated --> Synthesis["Synthesis agent"]
+    Synthesis --> Final["final/working_paper.md"]
 
     Harness["co-math harness<br/>init, messages, workstreams, gates, render-final"]
     Harness -. validates .-> GoalGate
     Harness -. validates .-> ReviewGate
-    Harness -. renders .-> Final
+    Harness -. renders .-> Generated
 ```
 
 ## Harness 命令
@@ -332,9 +385,13 @@ co-math refresh-skills --workspace workspace
 co-math suggest-skills --workspace workspace --query "..."
 co-math skill-handoff --workspace workspace --skill optimization-skill --mode skill_guided --reason "..." --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
-co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
+co-math approve-goal --workspace workspace --goal-id G1 --approved-by user --approval-id approval-G1-001
+co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof --author-run-id proof-run-001
+co-math submit-review --workspace workspace --workstream-id WS-G1-001-literature-baseline-review --reviewer logic_reviewer --reviewer-run-id review-run-001 --approved --severity info --issue-type logic --comment "Approved."
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
-co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-example
+co-math check-gate --workspace workspace --gate workstream_readiness --workstream-id WS-G1-001-literature-baseline-review
+co-math complete-workstream --workspace workspace --workstream-id WS-G1-001-literature-baseline-review
+co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-literature-baseline-review
 co-math render-final --workspace workspace
 ```
 

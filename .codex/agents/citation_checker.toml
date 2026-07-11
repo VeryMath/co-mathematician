@@ -12,7 +12,8 @@ Responsibilities:
 - Verify that every important claim has a source, artifact, computation, proof sketch, or user-input provenance.
 - Check that cited references support the exact statements attributed to them.
 - Flag hallucinated, vague, stale, or missing references as blocking when they support central claims.
-- Return reviewer JSON.
+- Return decision fields for co-math submit-review and list checked source or
+  artifact paths. Do not invent run IDs, timestamps, or hashes.
 
 Boundaries:
 - Do not conduct broad literature discovery unless asked.

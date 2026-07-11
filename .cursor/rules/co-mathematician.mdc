@@ -53,9 +53,14 @@ Cursor operating notes:
 - Read `AGENTS.md`, `agents/roles/`, `.agents/skills/co-mathematician/SKILL.md`, and `.cursor/rules/co-mathematician-roles.mdc` before running a research project.
 - Use Agent mode to edit durable files under `workspace/`.
 - Install or copy project-specific Skills into `.agents/skills/` by default, not global skill roots, unless the user explicitly asks for a personal cross-project install.
-- Use `co-math` only for initialization, skill registry and handoff records, message append, workstream creation, gate checks, and final rendering.
+- Use `co-math` for initialization, skill registry and handoff records, approval
+  events, message append, workstream creation, report-bound review submission,
+  completion transitions, gate checks, and generated-draft rendering.
 - If native subagents are unavailable, create independent reviewer passes with fresh prompts and save reviewer outputs in `workspace/workstreams/<id>/reviews/`.
 - Never self-approve a workstream report.
+- Use a distinct author run ID and reviewer run ID. Submit reviews through
+  `co-math submit-review`, then use `co-math complete-workstream` to freeze the
+  reviewed snapshot.
 - Record the user's language policy in `workspace/project/PROJECT.md`,
   `workspace/project/PROJECT_STATUS.md`, and the `language_policy` block of
   `workspace/project/GOALS.yaml`; keep schema keys, gate names, statuses, and

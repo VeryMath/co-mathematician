@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from .gating import check_gate
 from .messages import append_message
 from .reports import render_final
+from .reviews import submit_review
 from .schemas import (
     VALID_MESSAGE_TYPES,
+    VALID_REVIEW_ISSUE_TYPES,
+    VALID_REVIEW_SEVERITIES,
     VALID_SKILL_HANDOFF_MODES,
     VALID_WORKSTREAM_KINDS,
 )
 from .skill_handoff import record_skill_handoff
 from .skills import refresh_skill_registry, suggest_skills
-from .workspace import init_workspace, new_workstream
+from .workspace import approve_goal, complete_workstream, init_workspace, new_workstream
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except Exception as exc:
-        print(f"ERROR: {exc}")
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
 
@@ -45,18 +49,63 @@ def build_parser() -> argparse.ArgumentParser:
     message_parser.add_argument("--uncertainty", action="append", default=[])
     message_parser.set_defaults(func=_cmd_append_message)
 
+    approve_parser = subparsers.add_parser(
+        "approve-goal", help="Record explicit user approval for a draft goal"
+    )
+    approve_parser.add_argument("--workspace", default="workspace")
+    approve_parser.add_argument("--goal-id", required=True)
+    approve_parser.add_argument("--approved-by", required=True)
+    approve_parser.add_argument("--approval-id", required=True)
+    approve_parser.set_defaults(func=_cmd_approve_goal)
+
     ws_parser = subparsers.add_parser("new-workstream", help="Create approved-goal workstream")
     ws_parser.add_argument("--workspace", default="workspace")
     ws_parser.add_argument("--goal-id", required=True)
     ws_parser.add_argument("--title", required=True)
     ws_parser.add_argument("--kind", choices=VALID_WORKSTREAM_KINDS, required=True)
+    ws_parser.add_argument("--author-run-id", required=True)
     ws_parser.set_defaults(func=_cmd_new_workstream)
+
+    review_parser = subparsers.add_parser(
+        "submit-review", help="Validate and append a report-bound reviewer record"
+    )
+    review_parser.add_argument("--workspace", default="workspace")
+    review_parser.add_argument("--workstream-id", required=True)
+    review_parser.add_argument("--reviewer", required=True)
+    review_parser.add_argument("--reviewer-run-id", required=True)
+    approval_group = review_parser.add_mutually_exclusive_group(required=True)
+    approval_group.add_argument("--approved", dest="approved", action="store_true")
+    approval_group.add_argument("--rejected", dest="approved", action="store_false")
+    review_parser.add_argument(
+        "--severity", choices=VALID_REVIEW_SEVERITIES, required=True
+    )
+    review_parser.add_argument(
+        "--issue-type", choices=VALID_REVIEW_ISSUE_TYPES, required=True
+    )
+    review_parser.add_argument("--comment", required=True)
+    review_parser.add_argument("--suggested-fix", default="")
+    review_parser.add_argument("--resolves", action="append", default=[])
+    review_parser.add_argument("--checked-artifact", action="append", default=[])
+    review_parser.add_argument("--review-id")
+    review_parser.set_defaults(func=_cmd_submit_review)
+
+    complete_parser = subparsers.add_parser(
+        "complete-workstream", help="Freeze a reviewed report and complete its lifecycle"
+    )
+    complete_parser.add_argument("--workspace", default="workspace")
+    complete_parser.add_argument("--workstream-id", required=True)
+    complete_parser.set_defaults(func=_cmd_complete_workstream)
 
     gate_parser = subparsers.add_parser("check-gate", help="Check a harness gate")
     gate_parser.add_argument("--workspace", default="workspace")
     gate_parser.add_argument(
         "--gate",
-        choices=("goal_approval", "workstream_completion", "final_render"),
+        choices=(
+            "goal_approval",
+            "workstream_readiness",
+            "workstream_completion",
+            "final_render",
+        ),
         required=True,
     )
     gate_parser.add_argument("--goal-id")
@@ -64,7 +113,9 @@ def build_parser() -> argparse.ArgumentParser:
     gate_parser.add_argument("--json", action="store_true")
     gate_parser.set_defaults(func=_cmd_check_gate)
 
-    render_parser = subparsers.add_parser("render-final", help="Render final working paper")
+    render_parser = subparsers.add_parser(
+        "render-final", help="Render a generated draft from reviewed snapshots"
+    )
     render_parser.add_argument("--workspace", default="workspace")
     render_parser.set_defaults(func=_cmd_render_final)
 
@@ -130,14 +181,60 @@ def _cmd_append_message(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_approve_goal(args: argparse.Namespace) -> int:
+    goal = approve_goal(
+        args.workspace,
+        goal_id=args.goal_id,
+        approved_by=args.approved_by,
+        approval_id=args.approval_id,
+    )
+    print(
+        f"Approved goal: {goal['id']} "
+        f"(approval_id: {goal['approval_id']})"
+    )
+    return 0
+
+
 def _cmd_new_workstream(args: argparse.Namespace) -> int:
     path = new_workstream(
         args.workspace,
         goal_id=args.goal_id,
         title=args.title,
         kind=args.kind,
+        author_run_id=args.author_run_id,
     )
     print(f"Created workstream: {path}")
+    return 0
+
+
+def _cmd_submit_review(args: argparse.Namespace) -> int:
+    path, record = submit_review(
+        args.workspace,
+        workstream_id=args.workstream_id,
+        reviewer=args.reviewer,
+        reviewer_run_id=args.reviewer_run_id,
+        approved=args.approved,
+        severity=args.severity,
+        issue_type=args.issue_type,
+        comment=args.comment,
+        suggested_fix=args.suggested_fix,
+        resolves=args.resolves,
+        checked_artifacts=args.checked_artifact,
+        review_id=args.review_id,
+    )
+    print(
+        f"Submitted review: {path} "
+        f"(report_sha256: {record['report_sha256']})"
+    )
+    return 0
+
+
+def _cmd_complete_workstream(args: argparse.Namespace) -> int:
+    snapshot = complete_workstream(
+        args.workspace,
+        workstream_id=args.workstream_id,
+    )
+    print(f"Completed workstream with reviewed snapshot: {snapshot}")
     return 0
 
 
@@ -170,7 +267,7 @@ def _cmd_check_gate(args: argparse.Namespace) -> int:
 
 def _cmd_render_final(args: argparse.Namespace) -> int:
     path = render_final(args.workspace)
-    print(f"Rendered final working paper: {path}")
+    print(f"Rendered generated working-paper draft: {path}")
     return 0
 
 

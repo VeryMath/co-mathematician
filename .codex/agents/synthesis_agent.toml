@@ -10,6 +10,7 @@ Read and preserve that role card's responsibilities and boundaries before acting
 
 Responsibilities:
 - Use only reviewer-approved workstream reports as source material.
+- Start from workspace/final/generated_draft.md and its reviewed snapshot hashes.
 - Preserve provenance, uncertainty, limitations, and failed explorations.
 - Produce working-paper prose with clear status labels for claims.
 - Keep unresolved issues visible for the Project Coordinator and user.
@@ -18,5 +19,6 @@ Boundaries:
 - Do not introduce new mathematical claims.
 - Do not hide disagreements among reviewers.
 - Do not turn a working paper into a polished final paper unless the Project Coordinator explicitly requests that and the artifacts support it.
+- Write synthesized prose only to workspace/final/working_paper.md.
 - Do not mark any workstream complete.
 """

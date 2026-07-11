@@ -22,6 +22,12 @@ validation.
 - If native subagents are unavailable, create an independent reviewer pass with a fresh prompt and save the review artifact under the workstream `reviews/` directory.
 - No agent may self-approve its own report.
 
+The harness provides cooperative-workflow integrity, not hostile-writer
+authorization. Locks, schemas, lifecycle commands, and completion manifests
+detect inconsistent or modified artifacts, but caller-provided actor and run IDs
+are not cryptographic identities. Use host-issued identities when the coding-agent
+platform exposes them.
+
 ## Adapter Architecture
 
 Use `agents/roles/` as the authoritative role definitions. Platform-specific
@@ -151,6 +157,7 @@ user wants to promote the Skill task into a durable research workstream.
 Use:
 
 ```bash
+PYTHONPATH=. python3 -m harness.co_math.cli approve-goal --workspace workspace --goal-id G1 --approved-by user --approval-id approval-G1-001
 PYTHONPATH=. python3 -m harness.co_math.cli check-gate --workspace workspace --gate goal_approval --goal-id G1
 ```
 
@@ -159,7 +166,7 @@ PYTHONPATH=. python3 -m harness.co_math.cli check-gate --workspace workspace --g
 Create workstreams only after goal approval:
 
 ```bash
-PYTHONPATH=. python3 -m harness.co_math.cli new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
+PYTHONPATH=. python3 -m harness.co_math.cli new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof --author-run-id proof-run-001
 ```
 
 Valid kinds are `proof`, `computation`, `literature`, and `review`.
@@ -173,6 +180,7 @@ Workstreams must write durable artifacts:
 - `artifacts/` for code, tables, figures, proof sketches, or citations
 - `failures/` for dead ends and rejected attempts
 - `reviews/` for independent reviewer output
+- `reviewed/completion-manifest.json` for the frozen goal/report/review evidence bundle
 - `report.md` for the reviewed workstream report
 
 ## Internal Messages As JSONL
@@ -209,7 +217,26 @@ Reports must contain explicit `Provenance`, `Uncertainty`, and `Failed Explorati
 
 ## Reviewer Loop
 
-Send each workstream report to an independent reviewer subagent, task agent, or fresh reviewer pass. Reviewers should output JSON matching `assets/reviewer_output_schema.json`.
+Send each workstream report to an independent reviewer subagent, task agent, or
+fresh reviewer pass. Reviewers return decision fields and checked artifact paths;
+the Project Coordinator persists them through `co-math submit-review`, which
+adds run, time, report-hash, and artifact-hash fields and validates the complete
+record against `assets/reviewer_output_schema.json`.
+
+Persist the result through the harness so schema, reviewer-run independence, and
+the current report SHA-256 are enforced. Pass each code, data, or computation
+file used by the reviewer with `--checked-artifact <workstream-relative-path>` so
+its digest is bound to the review and completion manifest:
+
+```bash
+PYTHONPATH=. python3 -m harness.co_math.cli submit-review \
+  --workspace workspace \
+  --workstream-id <id> \
+  --reviewer logic_reviewer \
+  --reviewer-run-id review-run-001 \
+  --approved --severity info --issue-type logic \
+  --comment "Approved."
+```
 
 If review fails:
 
@@ -218,26 +245,30 @@ If review fails:
 - keep unresolved uncertainty visible
 - do not mark the workstream complete
 
-If a later reviewer pass resolves a blocking review, preserve both reviews. Mark
-the follow-up reviewer JSON with `resolves: ["<blocking-review-file>.json"]`, or
-mark the original review with `resolved: true`, so the completion gate can
-distinguish archived blocking feedback from unresolved blockers.
+If a later reviewer pass resolves a blocking review, preserve both reviews and
+submit an approved independent follow-up with
+`--resolves <blocking-review-file>.json`. Unapproved or report-stale reviews
+cannot resolve blockers.
 
 Use:
 
 ```bash
+PYTHONPATH=. python3 -m harness.co_math.cli check-gate --workspace workspace --gate workstream_readiness --workstream-id <id>
+PYTHONPATH=. python3 -m harness.co_math.cli complete-workstream --workspace workspace --workstream-id <id>
 PYTHONPATH=. python3 -m harness.co_math.cli check-gate --workspace workspace --gate workstream_completion --workstream-id <id>
 ```
 
 ## Final Working Paper
 
-Render final output only from reviewed workstream reports:
+Render a generated draft only from immutable reviewed snapshots:
 
 ```bash
 PYTHONPATH=. python3 -m harness.co_math.cli render-final --workspace workspace
 ```
 
-The final output is `workspace/final/working_paper.md`. It is a working paper, not a chat summary.
+The harness output is `workspace/final/generated_draft.md`. A synthesis agent may
+turn it into `workspace/final/working_paper.md`; the harness does not overwrite
+that synthesized working paper.
 
 ## Assets
 

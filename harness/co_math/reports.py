@@ -2,39 +2,59 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .gating import check_workstream_completion
+from .gating import check_final_render
 from .schemas import utc_timestamp
+from .storage import (
+    atomic_write_text,
+    bytes_sha256,
+    resolve_managed_directory,
+    resolve_managed_file,
+    workspace_lock,
+)
+from .workspace import (
+    _refresh_project_status_unlocked,
+    resolve_workstream_path,
+)
 
 
 def render_final(workspace: str | Path) -> Path:
     root = Path(workspace)
-    final_dir = root / "final"
-    final_dir.mkdir(parents=True, exist_ok=True)
-
-    sections: list[str] = []
-    for workstream in sorted((root / "workstreams").glob("*")):
-        if not workstream.is_dir():
-            continue
-        gate = check_workstream_completion(root, workstream.name)
+    with workspace_lock(root):
+        gate = check_final_render(root)
         if not gate.passed:
-            continue
-        report = workstream / "report.md"
-        sections.append(
-            f"## Workstream: {workstream.name}\n\n"
-            + report.read_text(encoding="utf-8").strip()
+            raise ValueError("No reviewed workstream reports are ready to render.")
+
+        sections: list[str] = []
+        for workstream_id in gate.details["approved_workstreams"]:
+            workstream = resolve_workstream_path(root, workstream_id)
+            descriptor = gate.details["snapshots"][workstream_id]
+            reviewed_dir = resolve_managed_directory(workstream, "reviewed")
+            snapshot = resolve_managed_file(workstream, descriptor["path"])
+            if snapshot.parent != reviewed_dir:
+                raise ValueError(
+                    f"Reviewed snapshot path is invalid: {descriptor['path']}"
+                )
+            snapshot_bytes = snapshot.read_bytes()
+            if bytes_sha256(snapshot_bytes) != descriptor["sha256"]:
+                raise ValueError(
+                    f"Reviewed snapshot digest changed: {workstream_id}"
+                )
+            sections.append(
+                f"## Workstream: {workstream_id}\n\n"
+                f"- reviewed_report_sha256: `{descriptor['sha256']}`\n\n"
+                + snapshot_bytes.decode("utf-8").strip()
+            )
+
+        final_dir = resolve_managed_directory(root, "final", create=True)
+        output = final_dir / "generated_draft.md"
+        atomic_write_text(
+            output,
+            "# Generated Working-Paper Draft\n\n"
+            f"- rendered_at: {utc_timestamp()}\n"
+            "- status: generated_from_reviewed_snapshots\n"
+            "- note: A synthesis agent may revise this into working_paper.md.\n\n"
+            + "\n\n---\n\n".join(sections)
+            + "\n",
         )
-
-    if not sections:
-        raise ValueError("No reviewed workstream reports are ready to render.")
-
-    output = final_dir / "working_paper.md"
-    output.write_text(
-        "# Working Paper\n\n"
-        f"- rendered_at: {utc_timestamp()}\n"
-        "- status: draft_from_reviewed_workstreams\n"
-        "- note: This is a working paper, not a chat summary.\n\n"
-        + "\n\n---\n\n".join(sections)
-        + "\n",
-        encoding="utf-8",
-    )
-    return output
+        _refresh_project_status_unlocked(root)
+        return output

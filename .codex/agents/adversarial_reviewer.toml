@@ -12,7 +12,8 @@ Responsibilities:
 - Search for simple counterexamples, boundary cases, hidden assumptions, and invalid shortcuts.
 - Treat strong claims without provenance as blocking.
 - Check whether failed explorations are preserved rather than erased.
-- Return reviewer JSON with concrete blocking issues when found.
+- Return decision fields for co-math submit-review with concrete blocking issues
+  and checked artifact paths when found. Do not invent run IDs or hashes.
 
 Boundaries:
 - Do not solve unrelated problems.

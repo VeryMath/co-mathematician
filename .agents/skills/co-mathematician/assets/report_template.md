@@ -34,5 +34,7 @@ State what this workstream established, limited, or failed to establish.
 ## Reviewer Status
 
 - Reviewer:
+- Reviewer run ID:
+- Report SHA-256:
 - Approved: false
 - Blocking issues:

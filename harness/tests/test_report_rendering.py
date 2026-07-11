@@ -1,21 +1,37 @@
 from __future__ import annotations
 
-import json
-
 import yaml
 
 from harness.co_math.reports import render_final
-from harness.co_math.workspace import init_workspace, new_workstream
+from harness.co_math.reviews import submit_review
+from harness.co_math.workspace import complete_workstream, init_workspace, new_workstream
 
 
 def write_goals(workspace):
     (workspace / "project" / "GOALS.yaml").write_text(
         yaml.safe_dump(
             {
+                "language_policy": {"status": "selected"},
                 "research_question": {"status": "approved"},
                 "goals": [
-                    {"id": "G1", "title": "Approved goal", "status": "approved"},
-                    {"id": "G2", "title": "Second approved goal", "status": "approved"},
+                    {
+                        "id": "G1",
+                        "title": "Approved goal",
+                        "status": "approved",
+                        "approved_by": "user",
+                        "approved_at": "2026-07-11T00:00:00Z",
+                        "approval_id": "approval-1",
+                        "workstreams": [],
+                    },
+                    {
+                        "id": "G2",
+                        "title": "Second approved goal",
+                        "status": "approved",
+                        "approved_by": "user",
+                        "approved_at": "2026-07-11T00:00:00Z",
+                        "approval_id": "approval-2",
+                        "workstreams": [],
+                    },
                 ],
             }
         ),
@@ -23,20 +39,19 @@ def write_goals(workspace):
     )
 
 
-def approve(workstream):
-    (workstream / "reviews" / "logic_reviewer.json").write_text(
-        json.dumps(
-            {
-                "approved": True,
-                "severity": "info",
-                "issue_type": "logic",
-                "reviewer": "logic_reviewer",
-                "comment": "Approved for scaffold rendering.",
-                "suggested_fix": "",
-            }
-        ),
-        encoding="utf-8",
+def approve(workspace, workstream):
+    submit_review(
+        workspace,
+        workstream_id=workstream.name,
+        reviewer="logic_reviewer",
+        reviewer_run_id="logic-review-run",
+        approved=True,
+        severity="info",
+        issue_type="logic",
+        comment="Approved for scaffold rendering.",
+        review_id="logic_reviewer.json",
     )
+    complete_workstream(workspace, workstream_id=workstream.name)
 
 
 def test_render_final_includes_only_approved_workstream_reports(tmp_path):
@@ -67,7 +82,7 @@ This report is eligible for final rendering.
 """,
         encoding="utf-8",
     )
-    approve(approved_ws)
+    approve(workspace, approved_ws)
 
     unapproved_ws.joinpath("report.md").write_text(
         """# Unapproved Workstream
@@ -90,7 +105,7 @@ This should not appear because review approval is missing.
     output_path = render_final(workspace)
     rendered = output_path.read_text(encoding="utf-8")
 
-    assert output_path == workspace / "final" / "working_paper.md"
+    assert output_path == workspace / "final" / "generated_draft.md"
     assert "Approved Workstream" in rendered
     assert "Unapproved Workstream" not in rendered
     assert "## Provenance" in rendered

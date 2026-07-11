@@ -27,11 +27,13 @@ The coding agent is the driver:
 - Refresh the project-local skill registry at session start, after skill installation, and before formalizing goals.
 - Before creating any workstream, match the workstream scope against the project-local skill registry and read any relevant `SKILL.md`.
 - Always get explicit user approval of goals before starting any workstream.
+- Record approval with `co-math approve-goal`; do not hand-edit `status: approved`.
 - Never start a workstream for an unapproved goal.
 - Important claims must include provenance.
 - Failed explorations must be saved as durable artifacts.
 - Uncertainty must be exposed explicitly in reports and status updates.
 - Every workstream report must be reviewed by an independent reviewer subagent.
+- Persist reviews with `co-math submit-review` so they are schema-valid and report-bound.
 - A workstream whose review has not passed must not be marked complete.
 - Final output must be a working paper, not a chat summary.
 
@@ -51,6 +53,16 @@ agent.
 - Cursor may also use `.cursor/rules/co-mathematician.mdc` and `.cursor/rules/co-mathematician-roles.mdc`.
 - If an environment has no native subagent feature, the Project Coordinator must still create an independent review pass with a fresh prompt and save the review artifact under the workstream `reviews/` directory.
 - No agent may self-approve its own workstream report.
+
+## Trust Model
+
+The harness is an integrity and workflow boundary for cooperating coding-agent
+runs. Workspace locks, atomic writes, schemas, SHA-256 manifests, and lifecycle
+commands detect stale, inconsistent, or accidentally modified artifacts. They do
+not authenticate an actor that already has unrestricted write access to the
+repository. Platform adapters must supply host-issued actor and run identities;
+do not treat caller-provided `approved_by`, `approval_id`, or `reviewer_run_id`
+strings as cryptographic proof of identity.
 
 ## Adapter Architecture
 
@@ -103,6 +115,8 @@ workspace/
     skill_handoffs.jsonl
   workstreams/
   final/
+    generated_draft.md
+    working_paper.md
 ```
 
 Each workstream directory should contain:
@@ -116,6 +130,7 @@ notes.md
 artifacts/
 failures/
 reviews/
+reviewed/
 report.md
 ```
 
@@ -125,11 +140,19 @@ A workstream may be treated as complete only when:
 
 - `report.md` exists.
 - At least one independent reviewer has approved it.
-- No blocking review remains unresolved. Preserve historical blocking reviews; a
-  later reviewer JSON may resolve them with `resolves: ["<review-file>.json"]`,
-  or the original review may be marked `resolved: true`.
+- The approving review matches the report SHA-256 and its reviewer run differs
+  from the author run.
+- No blocking review remains unresolved. Preserve historical blocking reviews;
+  only a later approved independent review may resolve them with
+  `resolves: ["<review-file>.json"]`.
 - The report has explicit `Provenance`, `Uncertainty`, and `Failed Explorations` sections.
 - Any code-backed claim has passing tests or is marked unverified.
+- `co-math complete-workstream` has frozen a reviewed snapshot and set status to `complete`.
+- Completion has written a schema-valid `reviewed/completion-manifest.json` that
+  binds the approved goal event, author run, report snapshot, and complete review
+  set by SHA-256, including any files declared through `--checked-artifact`.
 - Project status has been updated to reflect the workstream state.
 
 If the gate fails, preserve the failure and escalate rather than claiming completion.
+`co-math render-final` writes `workspace/final/generated_draft.md`; only the
+synthesis agent writes `workspace/final/working_paper.md`.

@@ -17,4 +17,5 @@ goals: []
 #     status: approved
 #     approved_by: user
 #     approved_at: "YYYY-MM-DDTHH:MM:SSZ"
+#     approval_id: "approval-G1-001"
 #     workstreams: []

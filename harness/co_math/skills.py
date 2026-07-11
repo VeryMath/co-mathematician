@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .schemas import utc_timestamp
+from .storage import atomic_write_json, atomic_write_text, workspace_lock
 
 SKILL_ROOT = Path(".agents") / "skills"
 REGISTRY_JSON = "skill_registry.json"
@@ -48,13 +49,12 @@ def refresh_skill_registry(
         "skills": skills,
     }
 
-    project = Path(workspace) / "project"
-    project.mkdir(parents=True, exist_ok=True)
-    (project / REGISTRY_JSON).write_text(
-        json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    (project / REGISTRY_MD).write_text(_registry_markdown(registry), encoding="utf-8")
+    workspace_root = Path(workspace)
+    with workspace_lock(workspace_root):
+        project = workspace_root / "project"
+        project.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(project / REGISTRY_JSON, registry)
+        atomic_write_text(project / REGISTRY_MD, _registry_markdown(registry))
     return registry
 
 

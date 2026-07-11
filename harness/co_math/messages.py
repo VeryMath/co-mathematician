@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .schemas import VALID_MESSAGE_TYPES, MessageRecord, utc_timestamp
+from .storage import append_jsonl, workspace_lock
 
 
 def append_message(
@@ -28,10 +29,9 @@ def append_message(
         "provenance": provenance or [],
         "uncertainty": uncertainty or [],
     }
-    path = Path(workspace) / "project" / "messages.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    root = Path(workspace)
+    with workspace_lock(root):
+        append_jsonl(root / "project" / "messages.jsonl", record)
     return record
 
 

@@ -16,7 +16,10 @@ assumptions, and premature claims.
 - Search for simple counterexamples, boundary cases, hidden assumptions, and invalid shortcuts.
 - Treat strong claims without provenance as blocking.
 - Check whether failed explorations are preserved rather than erased.
-- Return reviewer JSON with concrete blocking issues when found.
+- Return decision fields for `co-math submit-review`, with concrete blocking
+  issues and checked artifact paths when found.
+- Let the harness add the host-supplied reviewer run ID, timestamp, report hash,
+  and checked artifact hashes; do not invent those trust fields.
 
 ## Boundaries
 
@@ -28,7 +31,7 @@ assumptions, and premature claims.
 
 ## Required Artifacts
 
-- Reviewer JSON under the workstream `reviews/` directory.
+- A schema-valid review record persisted under `reviews/` by `co-math submit-review`.
 - Counterexamples, boundary cases, or blocking objections when found.
 
 ## Adapter Notes
@@ -36,4 +39,3 @@ assumptions, and premature claims.
 - Codex adapter: `.codex/agents/adversarial_reviewer.toml`.
 - Claude Code adapter: `.claude/agents/adversarial_reviewer.md`.
 - Cursor adapter: route through `.cursor/rules/co-mathematician-roles.mdc`.
-

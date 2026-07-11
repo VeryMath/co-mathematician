@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "co-mathematician-workspace"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight harness for a coding-agent-driven AI Co-Mathematician workspace."
 requires-python = ">=3.9"
-dependencies = ["PyYAML>=6.0"]
+dependencies = ["jsonschema>=4.18", "PyYAML>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
@@ -17,6 +17,9 @@ co-math = "harness.co_math.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["harness*"]
+
+[tool.setuptools.package-data]
+"harness.co_math.assets" = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]

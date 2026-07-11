@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 
+import harness.co_math.skills as skills_module
 from harness.co_math.skills import refresh_skill_registry, suggest_skills
 from harness.co_math.workspace import init_workspace
 
@@ -142,3 +144,23 @@ def test_suggest_skills_expands_common_chinese_math_terms(tmp_path):
 
     assert len(matches) == 1
     assert matches[0]["name"] == "optimization-skill"
+
+
+def test_refresh_skill_registry_uses_workspace_lock(tmp_path, monkeypatch):
+    existing_lock = getattr(skills_module, "workspace_lock", None)
+    assert callable(existing_lock), "registry writes must use the workspace lock"
+    repo = tmp_path / "repo"
+    workspace = repo / "workspace"
+    init_workspace(workspace)
+    write_skill(repo, "test-skill", "Use for lock validation.")
+    entered = []
+
+    @contextmanager
+    def spy_lock(root):
+        entered.append(root)
+        yield
+
+    monkeypatch.setattr(skills_module, "workspace_lock", spy_lock)
+    refresh_skill_registry(workspace, repo_root=repo)
+
+    assert entered == [workspace]

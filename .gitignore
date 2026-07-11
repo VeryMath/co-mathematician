@@ -59,6 +59,7 @@ logs/
 tmp/
 temp/
 .cache/
+.co-math.lock
 
 # Local workspace review artifacts
 workspace/project/*_REVIEW.md

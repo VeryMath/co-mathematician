@@ -4,17 +4,13 @@
 
 A repository-backed mathematical research workspace for coding agents.
 
-[中文说明](README.zh-CN.md) · [Contributors](CONTRIBUTORS.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Architecture](#what-this-workspace-does)
+[中文说明](README.zh-CN.md) · [Contributors](CONTRIBUTORS.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Updates](#version-updates) · [Architecture](#what-this-workspace-does)
 
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
-
-<p align="center">
-  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
-</p>
 
 Co-Mathematician is a lightweight research workspace for using a repository-aware
 coding agent as an AI co-mathematician. It is designed to be cloned, opened in a
@@ -40,11 +36,44 @@ Co-Mathematician turns a math research conversation into a file-backed project:
 - `workspace/project/` stores the research question, goals, status, and messages
 - `workspace/workstreams/` stores proof, computation, literature, and review work
 - reviewer agents or separate reviewer sessions check reports before completion
-- `workspace/final/working_paper.md` is rendered only from reviewed reports
+- completion freezes a content-addressed reviewed report and review-evidence bundle
+- `workspace/final/generated_draft.md` is rendered from reviewed snapshots
+- a synthesis agent may turn that draft into `workspace/final/working_paper.md`
 
 The Python harness does not run agents. It only initializes files, appends
-messages, creates approved workstreams, checks gates, and renders the final
-working paper.
+messages, records lifecycle transitions, creates approved workstreams, validates
+report-bound reviews, checks gates, and renders a generated draft.
+
+### Trust boundary
+
+The harness protects cooperative multi-agent workflows against stale state,
+partial writes, path escape, and drift in reports, review records, and explicitly
+declared checked artifacts. Its completion manifest binds the goal approval
+event, author run, reviewed report, review set, and declared checked artifacts by
+SHA-256. It is not an authorization system for a hostile process
+that already has unrestricted repository write access. Production adapters
+should supply host-issued actor and run identities rather than treating CLI
+strings as cryptographic identity evidence.
+
+## Version Updates
+
+### 0.2.0 (2026-07-11)
+
+- hardened `approve-goal`, `submit-review`, and `complete-workstream` into
+  explicit lifecycle transitions with schema checks, run IDs, report SHA-256
+  binding, and completion manifests
+- added workspace locking, atomic writes, ID validation, and path containment
+  checks for concurrent workstream creation and shared state updates
+- split final rendering into reviewed `generated_draft.md` snapshots and a
+  synthesis-owned `working_paper.md`
+- added canonical `workstream_coordinator` and `literature_researcher` roles
+  with Codex, Claude Code, and Cursor adapters
+- documented the cooperative trust boundary and review-time checked-artifact hashing
+
+### 0.1.0
+
+- initial public workspace protocol with project files, approved goals,
+  workstreams, reviewer gates, and platform adapters
 
 ## Install And Open The Workspace
 
@@ -211,11 +240,15 @@ workspace/project/PROJECT_STATUS.md
 workspace/project/messages.jsonl
 ```
 
-Draft goals are not executable. A goal can receive workstreams only when its
-status is:
+Draft goals are not executable. After the user approves a goal in chat, record
+that approval as a unique event:
 
-```yaml
-status: approved
+```bash
+co-math approve-goal \
+  --workspace workspace \
+  --goal-id G1 \
+  --approved-by user \
+  --approval-id approval-G1-001
 ```
 
 Check a goal gate:
@@ -255,7 +288,8 @@ co-math new-workstream \
   --workspace workspace \
   --goal-id G1 \
   --title "Literature baseline review" \
-  --kind literature
+  --kind literature \
+  --author-run-id literature-run-001
 ```
 
 Allowed workstream kinds are `proof`, `computation`, `literature`, and `review`.
@@ -267,18 +301,37 @@ Each workstream should produce a report with:
 - failed explorations
 - independent reviewer output under `reviews/`
 
-Check completion:
+Submit reviewer output through the schema-validating command. The harness binds
+the review to the current `report.md` SHA-256 and rejects the author run as a
+reviewer:
 
 ```bash
-co-math check-gate \
+co-math submit-review \
   --workspace workspace \
-  --gate workstream_completion \
-  --workstream-id WS-G1-001-example
+  --workstream-id WS-G1-001-literature-baseline-review \
+  --reviewer logic_reviewer \
+  --reviewer-run-id logic-review-run-001 \
+  --approved \
+  --severity info \
+  --issue-type logic \
+  --comment "Approved."
 ```
 
-## Rendering The Working Paper
+Use repeated `--checked-artifact artifacts/<file>` options for code, data, or
+computation outputs that support the decision. Paths are workstream-relative;
+the harness records and later rechecks their SHA-256 digests.
 
-When workstream reports pass independent review, render the final working paper:
+Check readiness, freeze the reviewed snapshot, and then check completion:
+
+```bash
+co-math check-gate --workspace workspace --gate workstream_readiness --workstream-id WS-G1-001-literature-baseline-review
+co-math complete-workstream --workspace workspace --workstream-id WS-G1-001-literature-baseline-review
+co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-literature-baseline-review
+```
+
+## Generating And Synthesizing The Working Paper
+
+Generate a draft from immutable reviewed snapshots:
 
 ```bash
 co-math render-final --workspace workspace
@@ -287,11 +340,12 @@ co-math render-final --workspace workspace
 The output is:
 
 ```text
-workspace/final/working_paper.md
+workspace/final/generated_draft.md
 ```
 
-This is a working paper, not a chat summary. It should preserve provenance,
-uncertainty, failed explorations, and reviewer status.
+The harness never overwrites `workspace/final/working_paper.md`. A synthesis
+agent owns that file and may revise the generated draft without introducing
+unreviewed claims.
 
 ## Workspace Framework
 
@@ -323,12 +377,15 @@ flowchart TD
     Revision --> Workstreams
     ReviewGate -- "yes" --> Complete["Workstream complete"]
 
-    Complete --> Final["final/working_paper.md"]
+    Complete --> Snapshot["reviewed/report-&lt;sha256&gt;.md"]
+    Snapshot --> Generated["final/generated_draft.md"]
+    Generated --> Synthesis["Synthesis agent"]
+    Synthesis --> Final["final/working_paper.md"]
 
     Harness["co-math harness<br/>init, messages, workstreams, gates, render-final"]
     Harness -. validates .-> GoalGate
     Harness -. validates .-> ReviewGate
-    Harness -. renders .-> Final
+    Harness -. renders .-> Generated
 ```
 
 ## Harness Commands
@@ -339,9 +396,13 @@ co-math refresh-skills --workspace workspace
 co-math suggest-skills --workspace workspace --query "..."
 co-math skill-handoff --workspace workspace --skill optimization-skill --mode skill_guided --reason "..." --query "..."
 co-math append-message --workspace workspace --sender project_coordinator --recipient user --type status --content "..."
-co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof
+co-math approve-goal --workspace workspace --goal-id G1 --approved-by user --approval-id approval-G1-001
+co-math new-workstream --workspace workspace --goal-id G1 --title "..." --kind proof --author-run-id proof-run-001
+co-math submit-review --workspace workspace --workstream-id WS-G1-001-literature-baseline-review --reviewer logic_reviewer --reviewer-run-id review-run-001 --approved --severity info --issue-type logic --comment "Approved."
 co-math check-gate --workspace workspace --gate goal_approval --goal-id G1
-co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-example
+co-math check-gate --workspace workspace --gate workstream_readiness --workstream-id WS-G1-001-literature-baseline-review
+co-math complete-workstream --workspace workspace --workstream-id WS-G1-001-literature-baseline-review
+co-math check-gate --workspace workspace --gate workstream_completion --workstream-id WS-G1-001-literature-baseline-review
 co-math render-final --workspace workspace
 ```
 

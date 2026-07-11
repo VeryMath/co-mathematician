@@ -16,7 +16,10 @@ report.
 - Verify that every important claim has user-input, source, artifact, computation, proof-sketch, or reviewer provenance.
 - Check that cited references support the exact statements attributed to them.
 - Flag hallucinated, vague, stale, or missing references as blocking when they support central claims.
-- Return reviewer JSON compatible with `reviewer_output_schema.json`.
+- Return decision fields for `co-math submit-review`, including checked source or
+  artifact paths when they support the decision.
+- Let the harness add the host-supplied reviewer run ID, timestamp, report hash,
+  and checked artifact hashes; do not invent those trust fields.
 
 ## Boundaries
 
@@ -28,7 +31,7 @@ report.
 
 ## Required Artifacts
 
-- Reviewer JSON under the workstream `reviews/` directory.
+- A schema-valid review record persisted under `reviews/` by `co-math submit-review`.
 - Source-to-claim notes when provenance is weak, missing, or misaligned.
 
 ## Adapter Notes
@@ -36,4 +39,3 @@ report.
 - Codex adapter: `.codex/agents/citation_checker.toml`.
 - Claude Code adapter: `.claude/agents/citation_checker.md`.
 - Cursor adapter: route through `.cursor/rules/co-mathematician-roles.mdc`.
-

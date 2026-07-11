@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
+import harness.co_math.messages as messages_module
 from harness.co_math.messages import append_message, read_messages
 from harness.co_math.workspace import init_workspace
 
@@ -79,6 +81,30 @@ def test_append_message_accepts_goal_proposal_records(tmp_path):
     )
 
     assert record["type"] == "proposal"
+
+
+def test_append_message_uses_workspace_lock(tmp_path, monkeypatch):
+    existing_lock = getattr(messages_module, "workspace_lock", None)
+    assert callable(existing_lock), "message writes must use the workspace lock"
+    workspace = tmp_path / "workspace"
+    init_workspace(workspace)
+    entered = []
+
+    @contextmanager
+    def spy_lock(root):
+        entered.append(root)
+        yield
+
+    monkeypatch.setattr(messages_module, "workspace_lock", spy_lock)
+    append_message(
+        workspace,
+        sender="project_coordinator",
+        recipient="user",
+        message_type="status",
+        content="Locked message.",
+    )
+
+    assert entered == [workspace]
 
 
 def test_checked_in_workspace_scaffold_includes_skill_handoff_state():

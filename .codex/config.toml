@@ -10,6 +10,10 @@ max_threads = 8
 max_depth = 3
 job_max_runtime_seconds = 3600
 
+[agents.workstream_coordinator]
+description = "Coordinates one approved workstream and integrates its report."
+config_file = "./.codex/agents/workstream_coordinator.toml"
+
 [agents.proof_explorer]
 description = "Searches proof strategies and proof gaps for an approved workstream."
 config_file = "./.codex/agents/proof_explorer.toml"
@@ -17,6 +21,10 @@ config_file = "./.codex/agents/proof_explorer.toml"
 [agents.computational_experimenter]
 description = "Runs narrow computational experiments for an approved workstream."
 config_file = "./.codex/agents/computational_experimenter.toml"
+
+[agents.literature_researcher]
+description = "Retrieves and aligns literature for an approved workstream."
+config_file = "./.codex/agents/literature_researcher.toml"
 
 [agents.logic_reviewer]
 description = "Checks logical consistency of a workstream report."

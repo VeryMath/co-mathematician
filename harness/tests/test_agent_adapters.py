@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLE_IDS = {
+    "workstream_coordinator",
     "proof_explorer",
     "computational_experimenter",
+    "literature_researcher",
     "logic_reviewer",
     "adversarial_reviewer",
     "citation_checker",
@@ -89,3 +92,20 @@ def test_platform_entry_docs_mention_skill_guided_mode():
     for text in (claude_text, cursor_text):
         assert "skill-guided mode" in text
         assert "co-math skill-handoff" in text
+
+
+def test_runtime_reviewer_schema_matches_project_skill_contract():
+    runtime_schema = ROOT / "harness" / "co_math" / "assets" / "reviewer_output_schema.json"
+    skill_schema = (
+        ROOT
+        / ".agents"
+        / "skills"
+        / "co-mathematician"
+        / "assets"
+        / "reviewer_output_schema.json"
+    )
+
+    assert runtime_schema.is_file()
+    assert json.loads(runtime_schema.read_text(encoding="utf-8")) == json.loads(
+        skill_schema.read_text(encoding="utf-8")
+    )
