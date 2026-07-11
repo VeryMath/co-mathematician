@@ -13,7 +13,7 @@
 </div>
 
 <p align="center">
-  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
+  <img src="assets/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
 </p>
 
 Co-Mathematician 是一个轻量级的数学研究工作区。它的用法不是启动一个新的
@@ -430,7 +430,7 @@ agents/roles/
 .codex/
 .claude/
 .cursor/
-docs/
+assets/
 harness/co_math/
 workspace/
 ```

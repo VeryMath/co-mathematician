@@ -13,7 +13,7 @@ A repository-backed mathematical research workspace for coding agents.
 </div>
 
 <p align="center">
-  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
+  <img src="assets/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
 </p>
 
 Co-Mathematician is a lightweight research workspace for using a repository-aware
@@ -442,7 +442,7 @@ agents/roles/
 .codex/
 .claude/
 .cursor/
-docs/
+assets/
 harness/co_math/
 workspace/
 ```
