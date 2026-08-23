@@ -157,11 +157,12 @@ def append_jsonl(path: str | Path, record: Any) -> None:
 
 
 @contextmanager
-def workspace_lock(workspace: str | Path) -> Iterator[None]:
-    root = Path(workspace).resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    project = resolve_managed_directory(root, "project", create=True)
-    lock_path = project / ".co-math.lock"
+def file_lock(path: str | Path) -> Iterator[None]:
+    requested = Path(path).expanduser()
+    requested.parent.mkdir(parents=True, exist_ok=True)
+    if requested.is_symlink():
+        raise ValueError(f"Lock file must not be a symlink: {requested}")
+    lock_path = requested.parent.resolve(strict=True) / requested.name
     thread_lock = _thread_lock(lock_path)
 
     with thread_lock:
@@ -183,6 +184,15 @@ def workspace_lock(workspace: str | Path) -> Iterator[None]:
             finally:
                 depths.pop(lock_path, None)
                 _unlock_file(handle)
+
+
+@contextmanager
+def workspace_lock(workspace: str | Path) -> Iterator[None]:
+    root = Path(workspace).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    project = resolve_managed_directory(root, "project", create=True)
+    with file_lock(project / ".co-math.lock"):
+        yield
 
 
 def _thread_lock(path: Path) -> threading.RLock:
