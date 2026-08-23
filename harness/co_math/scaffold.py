@@ -83,6 +83,7 @@ def adopt_project(path: str | Path) -> CreateProjectResult:
     root = requested.resolve(strict=True)
 
     with file_lock(config_home() / ".create.lock"):
+        _reject_descendant_projects(root)
         manifest_path = root / MANIFEST_FILENAME
         if manifest_path.exists() or manifest_path.is_symlink():
             project = resolve_project(project=root)
@@ -95,7 +96,7 @@ def adopt_project(path: str | Path) -> CreateProjectResult:
             project = resolve_project(project=root)
         if project is None:  # pragma: no cover - an adopted project always resolves
             raise RuntimeError(f"Adopted project could not be resolved: {root}")
-        warnings = _register_with_warning(project)
+        warnings = _register_with_warning(project, replace_stale=True)
         return CreateProjectResult(project=project, warnings=warnings)
 
 
@@ -140,6 +141,33 @@ def _reject_nested_project(target: Path) -> None:
             raise ValueError(
                 f"Refusing to create a nested Co-Math project inside {ancestor}"
             )
+
+
+def _reject_descendant_projects(root: Path) -> None:
+    for current, directory_names, file_names in os.walk(
+        root,
+        topdown=True,
+        onerror=_raise_walk_error,
+        followlinks=False,
+    ):
+        current_path = Path(current)
+        directory_names[:] = [
+            name
+            for name in directory_names
+            if name != ".git" and not (current_path / name).is_symlink()
+        ]
+        if current_path == root:
+            continue
+        manifest = current_path / MANIFEST_FILENAME
+        if MANIFEST_FILENAME in file_names or manifest.is_symlink():
+            raise ValueError(
+                f"Refusing to adopt a directory containing descendant "
+                f"Co-Math project: {current_path}"
+            )
+
+
+def _raise_walk_error(error: OSError) -> None:
+    raise error
 
 
 def _assert_no_symlink_components(path: Path) -> None:
@@ -202,9 +230,16 @@ def _publish_temporary_project(
         raise
 
 
-def _register_with_warning(project: ResolvedProject) -> tuple[str, ...]:
+def _register_with_warning(
+    project: ResolvedProject,
+    *,
+    replace_stale: bool = False,
+) -> tuple[str, ...]:
     try:
-        register_project(project.root)
+        if replace_stale:
+            register_project(project.root, replace_stale=True)
+        else:
+            register_project(project.root)
     except Exception as exc:
         return (
             "Project created, but registry update failed: "

@@ -108,6 +108,29 @@ def test_cli_list_projects_stale_registry_pointer(
     assert listed[0]["project_id"] == created["project_id"]
 
 
+def test_cli_adopt_repairs_stale_pointer_after_project_move(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    created = _create_with_cli(tmp_path, monkeypatch, capsys)
+    original = Path(str(created["path"]))
+    moved = tmp_path / "moved-project"
+    original.rename(moved)
+
+    assert main(["adopt", str(moved), "--json"]) == 0
+    adopted = json.loads(capsys.readouterr().out)
+    assert adopted["project_id"] == created["project_id"]
+    assert adopted["path"] == str(moved.resolve())
+    assert adopted["warnings"] == []
+
+    assert main(["list", "--json"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert len(listed) == 1
+    assert listed[0]["registry_status"] == "valid"
+    assert listed[0]["path"] == str(moved.resolve())
+
+
 def test_cli_discovers_project_from_child_for_existing_lifecycle_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

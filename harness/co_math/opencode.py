@@ -50,6 +50,13 @@ class OpenCodeRemovalResult:
     removed_files: tuple[Path, ...]
     preserved_files: tuple[Path, ...]
     warnings: tuple[str, ...]
+    manifest_retained: bool
+
+
+@dataclass(frozen=True)
+class _ManagedFileSnapshot:
+    path: Path
+    content: str | None
 
 
 def resolve_opencode_config_dir(config_dir: str | Path | None = None) -> Path:
@@ -119,21 +126,39 @@ def install_opencode_adapter(
     manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
 
     with file_lock(root / ".co-math-adapter.lock"):
+        if manifest_path.is_symlink():
+            raise ValueError(
+                f"OpenCode adapter install manifest must not be a symlink: {manifest_path}"
+            )
         previous = _read_install_manifest(manifest_path) if manifest_path.exists() else None
         previous_digests = _manifest_digest_map(previous) if previous is not None else {}
         _check_safe_overwrite(root, desired, previous_digests)
-        save_user_config(
-            UserConfig(
-                projects_home=user_config.projects_home,
-                allowed_project_roots=user_config.allowed_project_roots,
-            )
+        snapshots = _snapshot_managed_files(
+            root,
+            (*desired, f"co-math/{INSTALL_MANIFEST_FILENAME}"),
         )
-        for relative_path, text in desired.items():
-            target = _managed_target(root, relative_path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(target, text)
-        manifest = _build_install_manifest(root, desired)
-        atomic_write_json(manifest_path, manifest)
+        try:
+            for relative_path, text in desired.items():
+                target = _managed_target(root, relative_path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(target, text)
+            manifest = _build_install_manifest(root, desired)
+            atomic_write_json(manifest_path, manifest)
+            save_user_config(
+                UserConfig(
+                    projects_home=user_config.projects_home,
+                    allowed_project_roots=user_config.allowed_project_roots,
+                )
+            )
+        except Exception as exc:
+            rollback_errors = _restore_managed_files(root, snapshots)
+            if rollback_errors:
+                details = "; ".join(rollback_errors)
+                raise RuntimeError(
+                    f"OpenCode adapter installation failed and rollback was incomplete: "
+                    f"{details}"
+                ) from exc
+            raise
 
     return _install_result(root)
 
@@ -145,7 +170,7 @@ def remove_opencode_adapter(
     root = resolve_opencode_config_dir(config_dir)
     manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
     if not manifest_path.exists():
-        return OpenCodeRemovalResult(root, (), (), ())
+        return OpenCodeRemovalResult(root, (), (), (), False)
 
     removed: list[Path] = []
     preserved: list[Path] = []
@@ -166,7 +191,14 @@ def remove_opencode_adapter(
                 continue
             target.unlink()
             removed.append(target)
-        manifest_path.unlink(missing_ok=True)
+        manifest_retained = bool(preserved)
+        if manifest_retained:
+            warnings.append(
+                "Retained the install manifest because modified or unsafe managed "
+                "files remain"
+            )
+        else:
+            manifest_path.unlink(missing_ok=True)
         for directory in (root / "co-math", root / "tools"):
             try:
                 directory.rmdir()
@@ -177,6 +209,7 @@ def remove_opencode_adapter(
         removed_files=tuple(sorted(removed)),
         preserved_files=tuple(sorted(preserved)),
         warnings=tuple(warnings),
+        manifest_retained=manifest_retained,
     )
 
 
@@ -286,7 +319,55 @@ def _managed_target(root: Path, relative_path: str) -> Path:
         current /= part
         if current.is_symlink():
             raise ValueError(f"Adapter managed path contains a symlink: {current}")
+        if current.exists() and not current.is_dir():
+            raise ValueError(
+                f"Adapter managed parent must be a directory: {current}"
+            )
     return target
+
+
+def _snapshot_managed_files(
+    root: Path,
+    relative_paths: Sequence[str],
+) -> tuple[_ManagedFileSnapshot, ...]:
+    snapshots: list[_ManagedFileSnapshot] = []
+    for relative_path in relative_paths:
+        target = _managed_target(root, relative_path)
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise ValueError(f"Adapter managed file is unsafe: {target}")
+        content = target.read_text(encoding="utf-8") if target.exists() else None
+        snapshots.append(_ManagedFileSnapshot(path=target, content=content))
+    return tuple(snapshots)
+
+
+def _restore_managed_files(
+    root: Path,
+    snapshots: Sequence[_ManagedFileSnapshot],
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    for snapshot in reversed(snapshots):
+        try:
+            if snapshot.content is None:
+                if snapshot.path.is_symlink() or snapshot.path.is_file():
+                    snapshot.path.unlink()
+                elif snapshot.path.exists():
+                    raise ValueError(f"Rollback target is not a file: {snapshot.path}")
+            else:
+                atomic_write_text(snapshot.path, snapshot.content)
+        except Exception as exc:  # pragma: no cover - requires rollback failure
+            errors.append(f"{snapshot.path}: {exc}")
+
+    directories = {
+        snapshot.path.parent
+        for snapshot in snapshots
+        if snapshot.path.parent != root
+    }
+    for directory in sorted(directories, key=lambda path: len(path.parts), reverse=True):
+        try:
+            directory.rmdir()
+        except OSError:
+            pass
+    return tuple(errors)
 
 
 def _check_safe_overwrite(

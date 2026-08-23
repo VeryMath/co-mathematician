@@ -430,16 +430,23 @@ def _cmd_install_opencode(args: argparse.Namespace) -> int:
 def _cmd_uninstall_opencode(args: argparse.Namespace) -> int:
     result = remove_opencode_adapter(config_dir=args.config_dir)
     output = {
-        "installed": False,
+        "installed": result.manifest_retained,
         "config_dir": str(result.config_dir),
         "removed_files": [str(path) for path in result.removed_files],
         "preserved_files": [str(path) for path in result.preserved_files],
         "warnings": list(result.warnings),
+        "manifest_retained": result.manifest_retained,
     }
     if args.json:
         _print_json(output)
     else:
-        print(f"Removed managed Co-Math OpenCode tools from: {result.config_dir}")
+        if result.manifest_retained:
+            print(
+                "Co-Math OpenCode uninstall is incomplete; managed files remain in: "
+                f"{result.config_dir}"
+            )
+        else:
+            print(f"Removed managed Co-Math OpenCode tools from: {result.config_dir}")
         for warning in result.warnings:
             print(f"WARNING: {warning}")
     return 0

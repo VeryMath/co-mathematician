@@ -103,6 +103,7 @@ def register_project(
     project_root: str | Path,
     *,
     opened_at: str | None = None,
+    replace_stale: bool = False,
 ) -> dict[str, str]:
     project = resolve_project(project=project_root)
     if project is None:  # pragma: no cover - explicit projects never return None
@@ -134,15 +135,22 @@ def register_project(
             ),
             None,
         )
-        if matching_id is not None and matching_id["manifest_path"] != manifest_value:
-            raise ValueError(
-                f"Project id {project.manifest.project_id} is already registered "
-                f"at {matching_id['manifest_path']}"
-            )
         if matching_path is not None and matching_path["project_id"] != project.manifest.project_id:
             raise ValueError(
                 f"Manifest path {manifest_value} is registered with a different project id"
             )
+        if matching_id is not None and matching_id["manifest_path"] != manifest_value:
+            previous_manifest = Path(matching_id["manifest_path"])
+            if (
+                not replace_stale
+                or previous_manifest.exists()
+                or previous_manifest.is_symlink()
+            ):
+                raise ValueError(
+                    f"Project id {project.manifest.project_id} is already registered "
+                    f"at {matching_id['manifest_path']}"
+                )
+            matching_id["manifest_path"] = manifest_value
 
         if matching_id is None:
             entry = {

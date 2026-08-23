@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import harness.co_math.opencode as opencode_module
 from harness.co_math.opencode import (
     TOOL_FILENAMES,
     adapter_resource_text,
@@ -153,6 +154,62 @@ def test_failed_reinstall_does_not_change_core_project_roots(
     assert load_user_config() == before
 
 
+def test_install_preflights_blocking_managed_directory_before_any_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    before = load_user_config()
+    config_dir = tmp_path / "opencode"
+    config_dir.mkdir()
+    blocker = config_dir / "co-math"
+    blocker.write_text("do not replace\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="directory"):
+        install_opencode_adapter(
+            config_dir=config_dir,
+            cli_path=_fake_cli(tmp_path),
+            projects_home=tmp_path / "projects",
+            allowed_roots=[tmp_path / "projects"],
+        )
+
+    assert blocker.read_text(encoding="utf-8") == "do not replace\n"
+    assert not (config_dir / "tools").exists()
+    assert load_user_config() == before
+
+
+def test_install_rolls_back_partial_adapter_writes_and_core_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    before = load_user_config()
+    original_write = opencode_module.atomic_write_text
+    failed = False
+
+    def fail_runner_once(path: str | Path, content: str) -> None:
+        nonlocal failed
+        if Path(path).name == "runner.ts" and not failed:
+            failed = True
+            raise OSError("injected adapter write failure")
+        original_write(path, content)
+
+    monkeypatch.setattr(opencode_module, "atomic_write_text", fail_runner_once)
+
+    config_dir = tmp_path / "opencode"
+    with pytest.raises(OSError, match="injected"):
+        install_opencode_adapter(
+            config_dir=config_dir,
+            cli_path=_fake_cli(tmp_path),
+            projects_home=tmp_path / "projects",
+            allowed_roots=[tmp_path / "projects"],
+        )
+
+    assert not (config_dir / "tools").exists()
+    assert not (config_dir / "co-math").exists()
+    assert load_user_config() == before
+
+
 def test_installer_rejects_symlinked_opencode_config_directory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -185,12 +242,23 @@ def test_uninstall_removes_only_digest_matching_managed_files(
     removal = remove_opencode_adapter(config_dir=installed.config_dir)
 
     assert modified in removal.preserved_files
+    assert removal.manifest_retained is True
     assert modified.read_text(encoding="utf-8") == "// keep modified runner\n"
     assert unrelated.is_file()
     assert not installed.config_file.exists()
-    assert not installed.manifest_file.exists()
+    assert installed.manifest_file.exists()
     assert all(not path.exists() for path in installed.tool_files)
     assert any("modified" in warning for warning in removal.warnings)
+
+    diagnosis = inspect_opencode_adapter(config_dir=installed.config_dir)
+    assert diagnosis["installed"] is True
+    assert diagnosis["healthy"] is False
+    assert any("digest mismatch" in issue for issue in diagnosis["issues"])
+
+    modified.unlink()
+    completed = remove_opencode_adapter(config_dir=installed.config_dir)
+    assert completed.manifest_retained is False
+    assert not installed.manifest_file.exists()
 
 
 def test_inspection_detects_healthy_and_drifted_installation(

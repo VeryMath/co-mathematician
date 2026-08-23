@@ -10,7 +10,7 @@ import pytest
 import harness.co_math.scaffold as scaffold_module
 from harness.co_math.project import read_manifest
 from harness.co_math.registry import UserConfig, list_registered_projects, save_user_config
-from harness.co_math.scaffold import create_project
+from harness.co_math.scaffold import adopt_project, create_project
 from harness.co_math.workspace import init_workspace, load_goals
 
 
@@ -187,6 +187,26 @@ def test_create_project_rejects_nested_project(
             path=outer / "nested",
             initialize_git=False,
         )
+
+
+def test_adopt_rejects_outer_directory_with_descendant_project(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_home(tmp_path, monkeypatch)
+    outer = tmp_path / "legacy-outer"
+    init_workspace(outer / "workspace")
+    inner = create_project(
+        "Inner",
+        path=outer / "inner",
+        initialize_git=False,
+    ).project.root
+
+    with pytest.raises(ValueError, match="descendant"):
+        adopt_project(outer)
+
+    assert not (outer / "co-math.toml").exists()
+    assert (inner / "co-math.toml").is_file()
 
 
 def test_failed_scaffold_leaves_no_target_or_temporary_directory(

@@ -147,6 +147,8 @@ def test_registry_rejects_duplicate_id_at_a_different_path(
 
     with pytest.raises(ValueError, match="already registered"):
         register_project(second)
+    with pytest.raises(ValueError, match="already registered"):
+        register_project(second, replace_stale=True)
 
 
 def test_registry_rejects_changed_identity_at_the_same_path(
