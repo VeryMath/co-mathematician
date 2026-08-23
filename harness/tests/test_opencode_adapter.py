@@ -13,7 +13,7 @@ from harness.co_math.opencode import (
     install_opencode_adapter,
     remove_opencode_adapter,
 )
-from harness.co_math.registry import load_user_config
+from harness.co_math.registry import UserConfig, load_user_config, save_user_config
 
 
 def _fake_cli(tmp_path: Path) -> Path:
@@ -208,6 +208,40 @@ def test_install_rolls_back_partial_adapter_writes_and_core_config(
     assert not (config_dir / "tools").exists()
     assert not (config_dir / "co-math").exists()
     assert load_user_config() == before
+
+
+def test_install_restores_core_config_when_save_raises_after_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    previous_home = tmp_path / "previous-projects"
+    before = save_user_config(
+        UserConfig(
+            projects_home=previous_home,
+            allowed_project_roots=(previous_home,),
+        )
+    )
+    original_save = opencode_module.save_user_config
+
+    def save_then_fail(config: UserConfig) -> UserConfig:
+        original_save(config)
+        raise OSError("injected post-config failure")
+
+    monkeypatch.setattr(opencode_module, "save_user_config", save_then_fail)
+
+    config_dir = tmp_path / "opencode"
+    with pytest.raises(OSError, match="post-config"):
+        install_opencode_adapter(
+            config_dir=config_dir,
+            cli_path=_fake_cli(tmp_path),
+            projects_home=tmp_path / "new-projects",
+            allowed_roots=[tmp_path / "new-projects"],
+        )
+
+    assert load_user_config() == before
+    assert not (config_dir / "tools").exists()
+    assert not (config_dir / "co-math").exists()
 
 
 def test_installer_rejects_symlinked_opencode_config_directory(

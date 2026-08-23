@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .project import CORE_VERSION
-from .registry import UserConfig, normalize_user_config, save_user_config
+from .registry import (
+    CONFIG_FILENAME,
+    UserConfig,
+    config_home as core_config_home,
+    normalize_user_config,
+    save_user_config,
+)
 from .storage import atomic_write_json, atomic_write_text, file_lock, file_sha256
 
 
@@ -124,6 +130,7 @@ def install_opencode_adapter(
         + "\n",
     }
     manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
+    core_config_root = core_config_home()
 
     with file_lock(root / ".co-math-adapter.lock"):
         if manifest_path.is_symlink():
@@ -133,32 +140,42 @@ def install_opencode_adapter(
         previous = _read_install_manifest(manifest_path) if manifest_path.exists() else None
         previous_digests = _manifest_digest_map(previous) if previous is not None else {}
         _check_safe_overwrite(root, desired, previous_digests)
-        snapshots = _snapshot_managed_files(
-            root,
-            (*desired, f"co-math/{INSTALL_MANIFEST_FILENAME}"),
-        )
-        try:
-            for relative_path, text in desired.items():
-                target = _managed_target(root, relative_path)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write_text(target, text)
-            manifest = _build_install_manifest(root, desired)
-            atomic_write_json(manifest_path, manifest)
-            save_user_config(
-                UserConfig(
-                    projects_home=user_config.projects_home,
-                    allowed_project_roots=user_config.allowed_project_roots,
-                )
+        with file_lock(core_config_root / ".config.lock"):
+            core_config_snapshot = _snapshot_text_file(
+                core_config_root / CONFIG_FILENAME
             )
-        except Exception as exc:
-            rollback_errors = _restore_managed_files(root, snapshots)
-            if rollback_errors:
-                details = "; ".join(rollback_errors)
-                raise RuntimeError(
-                    f"OpenCode adapter installation failed and rollback was incomplete: "
-                    f"{details}"
-                ) from exc
-            raise
+            snapshots = _snapshot_managed_files(
+                root,
+                (*desired, f"co-math/{INSTALL_MANIFEST_FILENAME}"),
+            )
+            try:
+                for relative_path, text in desired.items():
+                    target = _managed_target(root, relative_path)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    atomic_write_text(target, text)
+                manifest = _build_install_manifest(root, desired)
+                atomic_write_json(manifest_path, manifest)
+                save_user_config(
+                    UserConfig(
+                        projects_home=user_config.projects_home,
+                        allowed_project_roots=user_config.allowed_project_roots,
+                    )
+                )
+            except Exception as exc:
+                rollback_errors = list(_restore_managed_files(root, snapshots))
+                try:
+                    _restore_text_file(core_config_snapshot)
+                except Exception as rollback_exc:  # pragma: no cover
+                    rollback_errors.append(
+                        f"{core_config_snapshot.path}: {rollback_exc}"
+                    )
+                if rollback_errors:
+                    details = "; ".join(rollback_errors)
+                    raise RuntimeError(
+                        "OpenCode adapter installation failed and rollback was "
+                        f"incomplete: {details}"
+                    ) from exc
+                raise
 
     return _install_result(root)
 
@@ -333,11 +350,29 @@ def _snapshot_managed_files(
     snapshots: list[_ManagedFileSnapshot] = []
     for relative_path in relative_paths:
         target = _managed_target(root, relative_path)
-        if target.is_symlink() or (target.exists() and not target.is_file()):
-            raise ValueError(f"Adapter managed file is unsafe: {target}")
-        content = target.read_text(encoding="utf-8") if target.exists() else None
-        snapshots.append(_ManagedFileSnapshot(path=target, content=content))
+        snapshots.append(_snapshot_text_file(target))
     return tuple(snapshots)
+
+
+def _snapshot_text_file(path: Path) -> _ManagedFileSnapshot:
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError(f"Managed text file is unsafe: {path}")
+    content = path.read_text(encoding="utf-8") if path.exists() else None
+    return _ManagedFileSnapshot(path=path, content=content)
+
+
+def _restore_text_file(snapshot: _ManagedFileSnapshot) -> None:
+    if snapshot.content is None:
+        if snapshot.path.is_symlink() or snapshot.path.is_file():
+            snapshot.path.unlink()
+        elif snapshot.path.exists():
+            raise ValueError(f"Rollback target is not a file: {snapshot.path}")
+        return
+    if snapshot.path.is_symlink() or (
+        snapshot.path.exists() and not snapshot.path.is_file()
+    ):
+        raise ValueError(f"Rollback target is unsafe: {snapshot.path}")
+    atomic_write_text(snapshot.path, snapshot.content)
 
 
 def _restore_managed_files(
@@ -347,13 +382,7 @@ def _restore_managed_files(
     errors: list[str] = []
     for snapshot in reversed(snapshots):
         try:
-            if snapshot.content is None:
-                if snapshot.path.is_symlink() or snapshot.path.is_file():
-                    snapshot.path.unlink()
-                elif snapshot.path.exists():
-                    raise ValueError(f"Rollback target is not a file: {snapshot.path}")
-            else:
-                atomic_write_text(snapshot.path, snapshot.content)
+            _restore_text_file(snapshot)
         except Exception as exc:  # pragma: no cover - requires rollback failure
             errors.append(f"{snapshot.path}: {exc}")
 
