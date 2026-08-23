@@ -5,10 +5,14 @@ import json
 import sys
 from pathlib import Path
 
+from .context import project_snapshot, render_resume_text
 from .gating import check_gate
 from .messages import append_message
+from .project import CORE_VERSION, ResolvedProject, resolve_project
+from .registry import config_home, list_registered_projects, load_user_config
 from .reports import render_final
 from .reviews import submit_review
+from .scaffold import adopt_project, create_project
 from .schemas import (
     VALID_MESSAGE_TYPES,
     VALID_REVIEW_ISSUE_TYPES,
@@ -18,7 +22,13 @@ from .schemas import (
 )
 from .skill_handoff import record_skill_handoff
 from .skills import refresh_skill_registry, suggest_skills
-from .workspace import approve_goal, complete_workstream, init_workspace, new_workstream
+from .workspace import (
+    VALID_LANGUAGE_POLICIES,
+    approve_goal,
+    complete_workstream,
+    init_workspace,
+    new_workstream,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,12 +45,44 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="co-math")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    new_parser = subparsers.add_parser("new", help="Create an independent Co-Math project")
+    new_parser.add_argument("name")
+    new_parser.add_argument("--path")
+    new_parser.add_argument("--language", choices=VALID_LANGUAGE_POLICIES)
+    new_parser.add_argument("--no-git", action="store_true")
+    new_parser.add_argument("--json", action="store_true")
+    new_parser.set_defaults(func=_cmd_new_project)
+
+    list_parser = subparsers.add_parser("list", help="List registered Co-Math projects")
+    list_parser.add_argument("--json", action="store_true")
+    list_parser.set_defaults(func=_cmd_list_projects)
+
+    status_parser = subparsers.add_parser("status", help="Inspect project state without writing")
+    _add_project_target(status_parser)
+    status_parser.add_argument("--json", action="store_true")
+    status_parser.set_defaults(func=_cmd_project_status)
+
+    resume_parser = subparsers.add_parser("resume", help="Reconstruct project context from files")
+    _add_project_target(resume_parser)
+    resume_parser.add_argument("--json", action="store_true")
+    resume_parser.set_defaults(func=_cmd_project_resume)
+
+    adopt_parser = subparsers.add_parser("adopt", help="Add an existing workspace as a project")
+    adopt_parser.add_argument("path")
+    adopt_parser.add_argument("--json", action="store_true")
+    adopt_parser.set_defaults(func=_cmd_adopt_project)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Diagnose Core and project state")
+    doctor_parser.add_argument("--project")
+    doctor_parser.add_argument("--json", action="store_true")
+    doctor_parser.set_defaults(func=_cmd_doctor)
+
     init_parser = subparsers.add_parser("init", help="Initialize workspace scaffold")
     init_parser.add_argument("--workspace", default="workspace")
     init_parser.set_defaults(func=_cmd_init)
 
     message_parser = subparsers.add_parser("append-message", help="Append JSONL message")
-    message_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(message_parser)
     message_parser.add_argument("--sender", required=True)
     message_parser.add_argument("--recipient", required=True)
     message_parser.add_argument("--type", dest="message_type", choices=VALID_MESSAGE_TYPES, required=True)
@@ -52,14 +94,14 @@ def build_parser() -> argparse.ArgumentParser:
     approve_parser = subparsers.add_parser(
         "approve-goal", help="Record explicit user approval for a draft goal"
     )
-    approve_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(approve_parser)
     approve_parser.add_argument("--goal-id", required=True)
     approve_parser.add_argument("--approved-by", required=True)
     approve_parser.add_argument("--approval-id", required=True)
     approve_parser.set_defaults(func=_cmd_approve_goal)
 
     ws_parser = subparsers.add_parser("new-workstream", help="Create approved-goal workstream")
-    ws_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(ws_parser)
     ws_parser.add_argument("--goal-id", required=True)
     ws_parser.add_argument("--title", required=True)
     ws_parser.add_argument("--kind", choices=VALID_WORKSTREAM_KINDS, required=True)
@@ -69,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_parser = subparsers.add_parser(
         "submit-review", help="Validate and append a report-bound reviewer record"
     )
-    review_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(review_parser)
     review_parser.add_argument("--workstream-id", required=True)
     review_parser.add_argument("--reviewer", required=True)
     review_parser.add_argument("--reviewer-run-id", required=True)
@@ -92,12 +134,12 @@ def build_parser() -> argparse.ArgumentParser:
     complete_parser = subparsers.add_parser(
         "complete-workstream", help="Freeze a reviewed report and complete its lifecycle"
     )
-    complete_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(complete_parser)
     complete_parser.add_argument("--workstream-id", required=True)
     complete_parser.set_defaults(func=_cmd_complete_workstream)
 
     gate_parser = subparsers.add_parser("check-gate", help="Check a harness gate")
-    gate_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(gate_parser)
     gate_parser.add_argument(
         "--gate",
         choices=(
@@ -116,15 +158,15 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser = subparsers.add_parser(
         "render-final", help="Render a generated draft from reviewed snapshots"
     )
-    render_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(render_parser)
     render_parser.set_defaults(func=_cmd_render_final)
 
     refresh_skills_parser = subparsers.add_parser(
         "refresh-skills",
         help="Scan project-local skills and write workspace skill registry",
     )
-    refresh_skills_parser.add_argument("--workspace", default="workspace")
-    refresh_skills_parser.add_argument("--repo-root", default=".")
+    _add_project_target(refresh_skills_parser)
+    refresh_skills_parser.add_argument("--repo-root")
     refresh_skills_parser.add_argument("--json", action="store_true")
     refresh_skills_parser.set_defaults(func=_cmd_refresh_skills)
 
@@ -132,8 +174,8 @@ def build_parser() -> argparse.ArgumentParser:
         "suggest-skills",
         help="Suggest project-local skills for a query",
     )
-    suggest_skills_parser.add_argument("--workspace", default="workspace")
-    suggest_skills_parser.add_argument("--repo-root", default=".")
+    _add_project_target(suggest_skills_parser)
+    suggest_skills_parser.add_argument("--repo-root")
     suggest_skills_parser.add_argument("--query", required=True)
     suggest_skills_parser.add_argument("--limit", type=int, default=5)
     suggest_skills_parser.add_argument(
@@ -148,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
         "skill-handoff",
         help="Record that inner workflow control is delegated to a project-local skill",
     )
-    handoff_parser.add_argument("--workspace", default="workspace")
+    _add_project_target(handoff_parser)
     handoff_parser.add_argument("--skill", required=True)
     handoff_parser.add_argument("--mode", choices=VALID_SKILL_HANDOFF_MODES, required=True)
     handoff_parser.add_argument("--reason", required=True)
@@ -161,6 +203,136 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _add_project_target(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--workspace")
+    parser.add_argument("--project")
+
+
+def _cmd_new_project(args: argparse.Namespace) -> int:
+    result = create_project(
+        args.name,
+        path=args.path,
+        language=args.language,
+        initialize_git=not args.no_git,
+    )
+    snapshot = project_snapshot(result.project)
+    output = {
+        "project_id": result.project.manifest.project_id,
+        "name": result.project.manifest.name,
+        "path": str(result.project.root),
+        "workspace": str(result.project.workspace),
+        "status": snapshot["status"],
+        "next_gate": snapshot["next_gate"],
+        "warnings": list(result.warnings),
+        "next_step": f"Open {result.project.root} in your coding-agent GUI.",
+    }
+    if args.json:
+        _print_json(output)
+    else:
+        print(f"Created Co-Math project: {output['name']}")
+        print(f"Path: {output['path']}")
+        print(f"Status: {output['status']}")
+        for warning in result.warnings:
+            print(f"WARNING: {warning}")
+        print(output["next_step"])
+    return 0
+
+
+def _cmd_list_projects(args: argparse.Namespace) -> int:
+    projects = _listed_projects()
+    if args.json:
+        _print_json(projects)
+        return 0
+    if not projects:
+        print("No registered Co-Math projects.")
+        return 0
+    for project in projects:
+        print(f"{project.get('name') or project['project_id']} [{project['status']}]")
+        print(f"  {project['path']}")
+    return 0
+
+
+def _cmd_project_status(args: argparse.Namespace) -> int:
+    snapshot = project_snapshot(_required_project(args))
+    if args.json:
+        _print_json(snapshot)
+    else:
+        print(f"{snapshot['project']['name']}: {snapshot['status']}")
+        print(f"Path: {snapshot['project']['path']}")
+        print(f"Next gate: {snapshot['next_gate']}")
+    return 0 if snapshot["status"] != "invalid" else 1
+
+
+def _cmd_project_resume(args: argparse.Namespace) -> int:
+    snapshot = project_snapshot(_required_project(args))
+    if args.json:
+        _print_json(snapshot)
+    else:
+        print(render_resume_text(snapshot))
+    return 0 if snapshot["status"] != "invalid" else 1
+
+
+def _cmd_adopt_project(args: argparse.Namespace) -> int:
+    result = adopt_project(args.path)
+    snapshot = project_snapshot(result.project)
+    output = {
+        "project_id": result.project.manifest.project_id,
+        "name": result.project.manifest.name,
+        "path": str(result.project.root),
+        "workspace": str(result.project.workspace),
+        "status": snapshot["status"],
+        "next_gate": snapshot["next_gate"],
+        "warnings": list(result.warnings),
+    }
+    if args.json:
+        _print_json(output)
+    else:
+        print(f"Adopted Co-Math project: {output['name']}")
+        print(f"Path: {output['path']}")
+        for warning in result.warnings:
+            print(f"WARNING: {warning}")
+    return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    config = load_user_config()
+    issues: list[str] = []
+    project_data: dict[str, object] | None = None
+    try:
+        project = _optional_project(args)
+        if project is not None:
+            snapshot = project_snapshot(project)
+            project_data = {
+                "project_id": project.manifest.project_id,
+                "name": project.manifest.name,
+                "path": str(project.root),
+                "workspace": str(project.workspace),
+                "status": snapshot["status"],
+            }
+            if snapshot["status"] == "invalid":
+                issues.extend(str(issue) for issue in snapshot["errors"])
+    except Exception as exc:
+        issues.append(str(exc))
+    output = {
+        "ok": not issues,
+        "core_version": CORE_VERSION,
+        "config_home": str(config_home()),
+        "projects_home": str(config.projects_home),
+        "allowed_project_roots": [str(path) for path in config.allowed_project_roots],
+        "project": project_data,
+        "issues": issues,
+    }
+    if args.json:
+        _print_json(output)
+    else:
+        print(f"Core {CORE_VERSION}: {'OK' if output['ok'] else 'ISSUES'}")
+        if project_data is not None:
+            print(f"Project: {project_data['path']} [{project_data['status']}]")
+        for issue in issues:
+            print(f"- {issue}")
+    return 0 if output["ok"] else 1
+
+
 def _cmd_init(args: argparse.Namespace) -> int:
     root = init_workspace(args.workspace)
     print(f"Initialized workspace: {Path(root)}")
@@ -168,8 +340,9 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
 
 def _cmd_append_message(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     record = append_message(
-        args.workspace,
+        workspace,
         sender=args.sender,
         recipient=args.recipient,
         message_type=args.message_type,
@@ -182,8 +355,9 @@ def _cmd_append_message(args: argparse.Namespace) -> int:
 
 
 def _cmd_approve_goal(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     goal = approve_goal(
-        args.workspace,
+        workspace,
         goal_id=args.goal_id,
         approved_by=args.approved_by,
         approval_id=args.approval_id,
@@ -196,8 +370,9 @@ def _cmd_approve_goal(args: argparse.Namespace) -> int:
 
 
 def _cmd_new_workstream(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     path = new_workstream(
-        args.workspace,
+        workspace,
         goal_id=args.goal_id,
         title=args.title,
         kind=args.kind,
@@ -208,8 +383,9 @@ def _cmd_new_workstream(args: argparse.Namespace) -> int:
 
 
 def _cmd_submit_review(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     path, record = submit_review(
-        args.workspace,
+        workspace,
         workstream_id=args.workstream_id,
         reviewer=args.reviewer,
         reviewer_run_id=args.reviewer_run_id,
@@ -230,8 +406,9 @@ def _cmd_submit_review(args: argparse.Namespace) -> int:
 
 
 def _cmd_complete_workstream(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     snapshot = complete_workstream(
-        args.workspace,
+        workspace,
         workstream_id=args.workstream_id,
     )
     print(f"Completed workstream with reviewed snapshot: {snapshot}")
@@ -239,8 +416,9 @@ def _cmd_complete_workstream(args: argparse.Namespace) -> int:
 
 
 def _cmd_check_gate(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     result = check_gate(
-        args.workspace,
+        workspace,
         args.gate,
         goal_id=args.goal_id,
         workstream_id=args.workstream_id,
@@ -266,19 +444,20 @@ def _cmd_check_gate(args: argparse.Namespace) -> int:
 
 
 def _cmd_render_final(args: argparse.Namespace) -> int:
-    path = render_final(args.workspace)
+    path = render_final(_workspace_for(args))
     print(f"Rendered generated working-paper draft: {path}")
     return 0
 
 
 def _cmd_refresh_skills(args: argparse.Namespace) -> int:
-    registry = refresh_skill_registry(args.workspace, repo_root=args.repo_root)
+    workspace = _workspace_for(args)
+    registry = refresh_skill_registry(workspace, repo_root=_repo_root_for(args))
     if args.json:
         print(json.dumps(registry, ensure_ascii=False, indent=2))
         return 0
     print(
         "Refreshed project skill registry: "
-        f"{Path(args.workspace) / 'project' / 'skill_registry.json'}"
+        f"{workspace / 'project' / 'skill_registry.json'}"
     )
     for skill in registry["skills"]:
         print(f"- {skill['name']}: {skill['path']}")
@@ -286,10 +465,11 @@ def _cmd_refresh_skills(args: argparse.Namespace) -> int:
 
 
 def _cmd_suggest_skills(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     matches = suggest_skills(
-        args.workspace,
+        workspace,
         args.query,
-        repo_root=args.repo_root,
+        repo_root=_repo_root_for(args),
         refresh=not args.no_refresh,
         limit=args.limit,
     )
@@ -305,8 +485,9 @@ def _cmd_suggest_skills(args: argparse.Namespace) -> int:
 
 
 def _cmd_skill_handoff(args: argparse.Namespace) -> int:
+    workspace = _workspace_for(args)
     record = record_skill_handoff(
-        args.workspace,
+        workspace,
         skill=args.skill,
         mode=args.mode,
         reason=args.reason,
@@ -320,9 +501,81 @@ def _cmd_skill_handoff(args: argparse.Namespace) -> int:
     print(
         "Recorded skill handoff: "
         f"{record['skill']} ({record['mode']}) -> "
-        f"{Path(args.workspace) / 'project' / 'skill_handoffs.jsonl'}"
+        f"{workspace / 'project' / 'skill_handoffs.jsonl'}"
     )
     return 0
+
+
+def _workspace_for(args: argparse.Namespace) -> Path:
+    explicit_workspace = getattr(args, "workspace", None)
+    if explicit_workspace:
+        return Path(explicit_workspace).expanduser()
+    project = _optional_project(args)
+    return project.workspace if project is not None else Path("workspace")
+
+
+def _optional_project(args: argparse.Namespace) -> ResolvedProject | None:
+    return resolve_project(
+        project=getattr(args, "project", None),
+        cwd=Path.cwd(),
+    )
+
+
+def _required_project(args: argparse.Namespace) -> ResolvedProject:
+    explicit_workspace = getattr(args, "workspace", None)
+    if explicit_workspace:
+        project = resolve_project(workspace=explicit_workspace)
+    else:
+        project = _optional_project(args)
+    if project is None:
+        raise ValueError(
+            "No Co-Math project was found. Open a directory containing co-math.toml "
+            "or pass --project PATH."
+        )
+    return project
+
+
+def _repo_root_for(args: argparse.Namespace) -> Path:
+    explicit = getattr(args, "repo_root", None)
+    if explicit:
+        return Path(explicit).expanduser()
+    explicit_workspace = getattr(args, "workspace", None)
+    if explicit_workspace:
+        workspace_project = resolve_project(workspace=explicit_workspace)
+        if workspace_project is not None:
+            return workspace_project.root
+        return Path(".")
+    project = _optional_project(args)
+    return project.root if project is not None else Path(".")
+
+
+def _listed_projects() -> list[dict[str, object]]:
+    results: list[dict[str, object]] = []
+    for entry in list_registered_projects():
+        item: dict[str, object] = dict(entry)
+        registry_status = str(entry["registry_status"])
+        if registry_status != "valid":
+            item["status"] = registry_status
+            item["next_gate"] = "adopt" if registry_status == "stale" else "doctor"
+            results.append(item)
+            continue
+        try:
+            project = resolve_project(project=str(entry["path"]))
+            if project is None:  # pragma: no cover - valid entries always resolve
+                raise ValueError("Project could not be resolved")
+            snapshot = project_snapshot(project)
+            item["status"] = snapshot["status"]
+            item["next_gate"] = snapshot["next_gate"]
+        except Exception as exc:
+            item["status"] = "invalid"
+            item["next_gate"] = "doctor"
+            item["error"] = str(exc)
+        results.append(item)
+    return results
+
+
+def _print_json(value: object) -> None:
+    print(json.dumps(value, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from .project import (
     write_manifest,
 )
 from .registry import config_home, load_user_config, register_project
-from .storage import file_lock
+from .storage import file_lock, resolve_managed_directory
 from .workspace import init_workspace, select_language_policy
 
 
@@ -69,14 +69,33 @@ def create_project(
         project = resolve_project(project=target)
         if project is None:  # pragma: no cover - a published project always resolves
             raise RuntimeError(f"Created project could not be resolved: {target}")
-        warnings: tuple[str, ...] = ()
-        try:
-            register_project(project.root)
-        except Exception as exc:
-            warnings = (
-                "Project created, but registry update failed: "
-                f"{exc}. Run `co-math adopt` to repair the registry.",
-            )
+        warnings = _register_with_warning(project)
+        return CreateProjectResult(project=project, warnings=warnings)
+
+
+def adopt_project(path: str | Path) -> CreateProjectResult:
+    requested = Path(path).expanduser()
+    if not requested.is_absolute():
+        requested = Path.cwd() / requested
+    _assert_no_symlink_components(requested)
+    if requested.is_symlink() or not requested.is_dir():
+        raise ValueError(f"Project directory is missing or unsafe: {requested}")
+    root = requested.resolve(strict=True)
+
+    with file_lock(config_home() / ".create.lock"):
+        manifest_path = root / MANIFEST_FILENAME
+        if manifest_path.exists() or manifest_path.is_symlink():
+            project = resolve_project(project=root)
+        else:
+            _reject_nested_project(root)
+            workspace = resolve_managed_directory(root, "workspace")
+            for directory in ("project", "workstreams", "final"):
+                resolve_managed_directory(workspace, directory)
+            write_manifest(root, new_manifest(validate_project_name(root.name)))
+            project = resolve_project(project=root)
+        if project is None:  # pragma: no cover - an adopted project always resolves
+            raise RuntimeError(f"Adopted project could not be resolved: {root}")
+        warnings = _register_with_warning(project)
         return CreateProjectResult(project=project, warnings=warnings)
 
 
@@ -181,3 +200,14 @@ def _publish_temporary_project(
         if removed_empty_target and not target.exists():
             target.mkdir()
         raise
+
+
+def _register_with_warning(project: ResolvedProject) -> tuple[str, ...]:
+    try:
+        register_project(project.root)
+    except Exception as exc:
+        return (
+            "Project created, but registry update failed: "
+            f"{exc}. Run `co-math adopt` to repair the registry.",
+        )
+    return ()
