@@ -159,8 +159,8 @@ co-math adopt /path/to/legacy-project
 ```
 
 Passing automated tests does not by itself verify OpenCode Desktop behavior.
-The release checklist records GUI tool discovery and natural-language create,
-open, and resume as a separate smoke gate.
+The [Desktop smoke checklist](docs/opencode-desktop-smoke-test.md) records GUI
+tool discovery and natural-language create, open, and resume as a separate gate.
 
 ### Repository Workspace Setup
 

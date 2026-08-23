@@ -21,6 +21,7 @@ co-math = "harness.co_math.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["harness*"]
+exclude = ["harness.tests*"]
 
 [tool.setuptools.package-data]
 "harness.co_math.assets" = ["*.json"]

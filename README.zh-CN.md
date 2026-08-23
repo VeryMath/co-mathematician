@@ -150,7 +150,8 @@ co-math adopt /path/to/legacy-project
 ```
 
 自动化测试通过不等于 OpenCode Desktop 真机行为已经验证。GUI 中的工具发现、
-自然语言创建、打开和恢复项目会作为单独的 smoke gate 记录。
+自然语言创建、打开和恢复项目会在
+[Desktop smoke checklist](docs/opencode-desktop-smoke-test.md) 中作为独立 gate 记录。
 
 ### 仓库内 Workspace 流程
 
