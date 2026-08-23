@@ -60,6 +60,7 @@ tmp/
 temp/
 .cache/
 .co-math.lock
+.worktrees/
 
 # Local workspace review artifacts
 workspace/project/*_REVIEW.md
