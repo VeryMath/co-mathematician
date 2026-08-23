@@ -4,10 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "co-mathematician-workspace"
-version = "0.2.0"
+version = "0.3.0"
 description = "Lightweight harness for a coding-agent-driven AI Co-Mathematician workspace."
 requires-python = ">=3.9"
-dependencies = ["jsonschema>=4.18", "PyYAML>=6.0"]
+dependencies = [
+  "jsonschema>=4.18",
+  "PyYAML>=6.0",
+  "tomli>=2.0; python_version < '3.11'",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
