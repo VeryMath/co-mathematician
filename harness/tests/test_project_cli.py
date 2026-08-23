@@ -18,6 +18,7 @@ def _configure_home(
 ) -> Path:
     projects_home = tmp_path / "projects"
     monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("OPENCODE_CONFIG_DIR", str(tmp_path / "opencode-config"))
     save_user_config(
         UserConfig(projects_home=projects_home, allowed_project_roots=(projects_home,))
     )
@@ -54,6 +55,14 @@ def _file_hashes(root: Path) -> dict[str, str]:
         for path in sorted(root.rglob("*"))
         if path.is_file() and not path.is_symlink()
     }
+
+
+def _fake_cli(tmp_path: Path) -> Path:
+    cli = tmp_path / "bin" / "co-math"
+    cli.parent.mkdir(parents=True, exist_ok=True)
+    cli.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    cli.chmod(0o755)
+    return cli
 
 
 def test_cli_new_list_status_and_resume_json(
@@ -288,8 +297,130 @@ def test_cli_doctor_is_read_only_and_reports_valid_project(
     assert diagnosis["ok"] is True
     assert diagnosis["core_version"] == "0.3.0"
     assert diagnosis["project"]["project_id"] == created["project_id"]
+    assert diagnosis["opencode"]["installed"] is False
     assert diagnosis["issues"] == []
     assert _file_hashes(root) == before
+
+
+def test_cli_installs_diagnoses_and_uninstalls_opencode_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    cli = _fake_cli(tmp_path)
+    config_dir = tmp_path / "opencode"
+    projects_home = tmp_path / "projects"
+
+    assert (
+        main(
+            [
+                "install-opencode",
+                "--config-dir",
+                str(config_dir),
+                "--cli-path",
+                str(cli),
+                "--projects-home",
+                str(projects_home),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    installed = json.loads(capsys.readouterr().out)
+    assert installed["installed"] is True
+    assert installed["config_dir"] == str(config_dir.resolve())
+    assert len(installed["tool_files"]) == 5
+
+    assert (
+        main(
+            [
+                "doctor",
+                "--opencode-config-dir",
+                str(config_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    diagnosis = json.loads(capsys.readouterr().out)
+    assert diagnosis["ok"] is True
+    assert diagnosis["opencode"]["healthy"] is True
+    assert diagnosis["opencode"]["cli_path_matches"] is True
+
+    assert (
+        main(
+            [
+                "uninstall-opencode",
+                "--config-dir",
+                str(config_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    removed = json.loads(capsys.readouterr().out)
+    assert removed["installed"] is False
+    assert removed["preserved_files"] == []
+
+
+def test_cli_install_opencode_explicit_home_defaults_to_allowed_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    projects_home = tmp_path / "research-projects"
+
+    assert (
+        main(
+            [
+                "install-opencode",
+                "--config-dir",
+                str(tmp_path / "opencode"),
+                "--cli-path",
+                str(_fake_cli(tmp_path)),
+                "--projects-home",
+                str(projects_home),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    config = json.loads(
+        (tmp_path / "opencode" / "co-math" / "config.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert config["projects_home"] == str(projects_home.resolve())
+    assert config["allowed_project_roots"] == [str(projects_home.resolve())]
+
+
+def test_cli_install_opencode_reports_missing_default_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("CO_MATH_CONFIG_HOME", str(tmp_path / "core-config"))
+    monkeypatch.setattr("harness.co_math.cli.shutil.which", lambda _: None)
+
+    assert (
+        main(
+            [
+                "install-opencode",
+                "--config-dir",
+                str(tmp_path / "opencode"),
+                "--projects-home",
+                str(tmp_path / "projects"),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "--cli-path" in error
+    assert "executable" in error
 
 
 def test_cli_human_resume_prints_actionable_summary(

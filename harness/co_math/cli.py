@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
 from .context import project_snapshot, render_resume_text
 from .gating import check_gate
 from .messages import append_message
+from .opencode import (
+    inspect_opencode_adapter,
+    install_opencode_adapter,
+    remove_opencode_adapter,
+)
 from .project import CORE_VERSION, ResolvedProject, resolve_project
 from .registry import config_home, list_registered_projects, load_user_config
 from .reports import render_final
@@ -74,8 +80,32 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor_parser = subparsers.add_parser("doctor", help="Diagnose Core and project state")
     doctor_parser.add_argument("--project")
+    doctor_parser.add_argument("--opencode-config-dir")
     doctor_parser.add_argument("--json", action="store_true")
     doctor_parser.set_defaults(func=_cmd_doctor)
+
+    install_opencode_parser = subparsers.add_parser(
+        "install-opencode",
+        help="Install global Co-Math tools for OpenCode",
+    )
+    install_opencode_parser.add_argument("--config-dir")
+    install_opencode_parser.add_argument("--cli-path")
+    install_opencode_parser.add_argument("--projects-home")
+    install_opencode_parser.add_argument(
+        "--allow-root",
+        action="append",
+        dest="allowed_roots",
+    )
+    install_opencode_parser.add_argument("--json", action="store_true")
+    install_opencode_parser.set_defaults(func=_cmd_install_opencode)
+
+    uninstall_opencode_parser = subparsers.add_parser(
+        "uninstall-opencode",
+        help="Remove managed global Co-Math tools from OpenCode",
+    )
+    uninstall_opencode_parser.add_argument("--config-dir")
+    uninstall_opencode_parser.add_argument("--json", action="store_true")
+    uninstall_opencode_parser.set_defaults(func=_cmd_uninstall_opencode)
 
     init_parser = subparsers.add_parser("init", help="Initialize workspace scaffold")
     init_parser.add_argument("--workspace", default="workspace")
@@ -313,6 +343,22 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
                 issues.extend(str(issue) for issue in snapshot["errors"])
     except Exception as exc:
         issues.append(str(exc))
+    opencode_data: dict[str, object]
+    try:
+        opencode_data = inspect_opencode_adapter(
+            config_dir=args.opencode_config_dir,
+        )
+        if opencode_data["installed"] and not opencode_data["healthy"]:
+            issues.extend(
+                f"OpenCode: {issue}" for issue in opencode_data["issues"]
+            )
+    except Exception as exc:
+        opencode_data = {
+            "installed": False,
+            "healthy": False,
+            "issues": [str(exc)],
+        }
+        issues.append(f"OpenCode: {exc}")
     output = {
         "ok": not issues,
         "core_version": CORE_VERSION,
@@ -320,6 +366,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         "projects_home": str(config.projects_home),
         "allowed_project_roots": [str(path) for path in config.allowed_project_roots],
         "project": project_data,
+        "opencode": opencode_data,
         "issues": issues,
     }
     if args.json:
@@ -328,9 +375,74 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         print(f"Core {CORE_VERSION}: {'OK' if output['ok'] else 'ISSUES'}")
         if project_data is not None:
             print(f"Project: {project_data['path']} [{project_data['status']}]")
+        if opencode_data["installed"]:
+            state = "OK" if opencode_data["healthy"] else "ISSUES"
+            print(f"OpenCode adapter: {state}")
+        else:
+            print("OpenCode adapter: not installed")
         for issue in issues:
             print(f"- {issue}")
     return 0 if output["ok"] else 1
+
+
+def _cmd_install_opencode(args: argparse.Namespace) -> int:
+    current = load_user_config()
+    cli_path = args.cli_path or shutil.which("co-math")
+    if not cli_path:
+        raise ValueError(
+            "Could not find the co-math executable; pass its absolute path with "
+            "--cli-path PATH."
+        )
+    projects_home = (
+        Path(args.projects_home).expanduser()
+        if args.projects_home
+        else current.projects_home
+    )
+    if args.allowed_roots:
+        allowed_roots = [Path(path).expanduser() for path in args.allowed_roots]
+    elif args.projects_home:
+        allowed_roots = [projects_home]
+    else:
+        allowed_roots = list(current.allowed_project_roots)
+    result = install_opencode_adapter(
+        config_dir=args.config_dir,
+        cli_path=cli_path,
+        projects_home=projects_home,
+        allowed_roots=allowed_roots,
+    )
+    output = {
+        "installed": True,
+        "config_dir": str(result.config_dir),
+        "tool_files": [str(path) for path in result.tool_files],
+        "runner_file": str(result.runner_file),
+        "config_file": str(result.config_file),
+        "manifest_file": str(result.manifest_file),
+        "next_step": "Restart OpenCode, then ask it to create or list Co-Math projects.",
+    }
+    if args.json:
+        _print_json(output)
+    else:
+        print(f"Installed Co-Math OpenCode tools in: {result.config_dir}")
+        print(output["next_step"])
+    return 0
+
+
+def _cmd_uninstall_opencode(args: argparse.Namespace) -> int:
+    result = remove_opencode_adapter(config_dir=args.config_dir)
+    output = {
+        "installed": False,
+        "config_dir": str(result.config_dir),
+        "removed_files": [str(path) for path in result.removed_files],
+        "preserved_files": [str(path) for path in result.preserved_files],
+        "warnings": list(result.warnings),
+    }
+    if args.json:
+        _print_json(output)
+    else:
+        print(f"Removed managed Co-Math OpenCode tools from: {result.config_dir}")
+        for warning in result.warnings:
+            print(f"WARNING: {warning}")
+    return 0
 
 
 def _cmd_init(args: argparse.Namespace) -> int:

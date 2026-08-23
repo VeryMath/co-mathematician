@@ -6,7 +6,7 @@ A repository-backed mathematical research workspace for coding agents.
 
 [中文说明](README.zh-CN.md) · [Contributors](CONTRIBUTORS.md) · [Setup](#install-and-open-the-workspace) · [First interaction](#first-interaction) · [Updates](#version-updates) · [Architecture](#what-this-workspace-does)
 
-![version](https://img.shields.io/badge/version-0.2.0-blue)
+![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,11 +16,11 @@ A repository-backed mathematical research workspace for coding agents.
   <img src="assets/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
 </p>
 
-Co-Mathematician is a lightweight research workspace for using a repository-aware
-coding agent as an AI co-mathematician. It is designed to be cloned, opened in a
-repository-aware coding agent, and used as a stateful mathematical research
-environment. Codex, Claude Code, Cursor, OpenCode, and similar tools are
-adapters to the same workspace protocol.
+Co-Mathematician is a lightweight project system for using a repository-aware
+coding agent as an AI co-mathematician. Install the stateless Core once, then
+create one independent, durable directory per mathematical research project.
+Codex, Claude Code, Cursor, OpenCode, and similar tools are adapters to the same
+filesystem-backed protocol.
 
 The core formula is:
 
@@ -61,6 +61,14 @@ strings as cryptographic identity evidence.
 
 ## Version Updates
 
+### 0.3.0 (2026-08-23)
+
+- separated the installed Co-Math Core from durable, independent research projects
+- added `new`, `list`, `status`, `resume`, `adopt`, and project-aware lifecycle commands
+- added an optional global OpenCode adapter with five typed project tools
+- added project-local OpenCode agents generated from the canonical role layer
+- preserved legacy checked-in workspaces and added non-destructive adoption
+
 ### 0.2.0 (2026-07-11)
 
 - hardened `approve-goal`, `submit-review`, and `complete-workstream` into
@@ -81,8 +89,83 @@ strings as cryptographic identity evidence.
 
 ## Install And Open The Workspace
 
-The recommended path is AI-assisted workspace setup. You can also set it up
-manually.
+For normal use, install Core once and keep research projects outside this source
+repository. The old checked-in `workspace/` remains supported for development
+and backward compatibility.
+
+### One-Time Core And OpenCode Setup
+
+Clone Core and install its command:
+
+```bash
+git clone https://github.com/VeryMath/co-mathematician.git
+cd co-mathematician
+python3 -m pip install -e .
+```
+
+Install the global OpenCode tools and choose the parent directory for future
+projects:
+
+```bash
+co-math install-opencode --projects-home ~/CoMathProjects
+co-math doctor --opencode-config-dir ~/.config/opencode
+```
+
+The installer records the absolute `co-math` executable path because a desktop
+app may not inherit your interactive shell `PATH`. Restart OpenCode after
+installation. To permit additional project locations, repeat `--allow-root`:
+
+```bash
+co-math install-opencode \
+  --projects-home ~/CoMathProjects \
+  --allow-root ~/CoMathProjects \
+  --allow-root /Volumes/Research
+```
+
+### Daily OpenCode GUI Flow
+
+In any OpenCode conversation, ask:
+
+```text
+Use Co-Math to create a project named Muon Convergence.
+Use the match document-language policy.
+```
+
+OpenCode calls the global typed tool and returns an absolute project path. Use
+OpenCode's folder picker to open that path; version 0.3 does not claim to switch
+the GUI workspace automatically. In the newly opened project, ask the agent to
+inspect the Co-Math state and start onboarding.
+
+When project A is finished, do not clear or reinitialize it. Ask OpenCode to
+create project B, then open B's returned directory. Each project has its own
+`co-math.toml`, `workspace/`, agent adapters, research history, and Git repository.
+
+To return later, open the project directory and ask OpenCode to resume from its
+files. You can also ask it to list all registered Co-Math projects. The equivalent
+CLI commands are:
+
+```bash
+co-math new "Muon Convergence" --language match
+co-math list
+co-math status --project ~/CoMathProjects/Muon\ Convergence
+co-math resume --project ~/CoMathProjects/Muon\ Convergence
+```
+
+Adopt an older directory that already contains a valid `workspace/` without
+moving or rewriting its research files:
+
+```bash
+co-math adopt /path/to/legacy-project
+```
+
+Passing automated tests does not by itself verify OpenCode Desktop behavior.
+The release checklist records GUI tool discovery and natural-language create,
+open, and resume as a separate smoke gate.
+
+### Repository Workspace Setup
+
+Use the following path when developing Co-Mathematician itself or intentionally
+using the legacy checked-in workspace.
 
 ### AI-Assisted Workspace Setup
 

@@ -6,7 +6,7 @@
 
 [English](README.md) · [贡献者](CONTRIBUTORS.md) · [安装](#安装并打开工作区) · [第一次交互](#第一次交互) · [版本更新](#版本更新) · [架构](#这个工作区能做什么)
 
-![version](https://img.shields.io/badge/version-0.2.0-blue)
+![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![workspace](https://img.shields.io/badge/workspace-research-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,10 +16,10 @@
   <img src="assets/co-mathematician-architecture.png" alt="Co-Mathematician 仓库架构" width="940">
 </p>
 
-Co-Mathematician 是一个轻量级的数学研究工作区。它的用法不是启动一个新的
-multi-agent platform，而是把一个能读写仓库的 coding agent 组织成一个可追踪、
-可复核、可接续的数学研究环境。Codex、Claude Code、Cursor、OpenCode 等工具
-只是同一套 workspace protocol 的 adapters。
+Co-Mathematician 是一个轻量级的数学研究项目系统。Co-Math Core 只安装一次；
+每个数学研究项目都创建成一个独立、可长期维护的目录。它不启动新的
+multi-agent platform，而是让 Codex、Claude Code、Cursor、OpenCode 等 coding
+agent 通过同一套文件协议协作。
 
 核心公式是：
 
@@ -57,6 +57,14 @@ identity，不能把 CLI 传入的字符串当作密码学身份证明。
 
 ## 版本更新
 
+### 0.3.0 (2026-08-23)
+
+- 将一次安装的无状态 Co-Math Core 与长期保存的独立研究项目分离
+- 新增 `new`、`list`、`status`、`resume`、`adopt` 和 project-aware lifecycle 命令
+- 新增可选的 OpenCode 全局 adapter，提供五个 typed project tools
+- 从 canonical role layer 生成项目级 OpenCode agents
+- 保留旧版仓库内 workspace，并支持不破坏原文件的 adoption
+
 ### 0.2.0 (2026-07-11)
 
 - 将 `approve-goal`、`submit-review` 和 `complete-workstream` 强化为显式
@@ -77,7 +85,77 @@ identity，不能把 CLI 传入的字符串当作密码学身份证明。
 
 ## 安装并打开工作区
 
-推荐方式是 AI 自动完成 workspace setup；你也可以手动安装。
+正常使用时，只安装一次 Core，并把每个数学项目放在源码仓库之外。旧的仓库内
+`workspace/` 仍用于开发和向后兼容。
+
+### 一次性安装 Core 和 OpenCode Adapter
+
+clone Core 并安装命令：
+
+```bash
+git clone https://github.com/VeryMath/co-mathematician.git
+cd co-mathematician
+python3 -m pip install -e .
+```
+
+安装 OpenCode 全局工具，并指定以后所有项目的父目录：
+
+```bash
+co-math install-opencode --projects-home ~/CoMathProjects
+co-math doctor --opencode-config-dir ~/.config/opencode
+```
+
+安装器会记录 `co-math` 可执行文件的绝对路径，因为桌面 GUI 不一定继承终端的
+`PATH`。安装后重启 OpenCode。如果还要允许其他项目位置，可重复传入
+`--allow-root`：
+
+```bash
+co-math install-opencode \
+  --projects-home ~/CoMathProjects \
+  --allow-root ~/CoMathProjects \
+  --allow-root /Volumes/Research
+```
+
+### 日常 OpenCode GUI 流程
+
+在任意 OpenCode 对话中说：
+
+```text
+用 Co-Math 新建一个名为 Muon Convergence 的项目。
+文档语言策略使用 match。
+```
+
+OpenCode 会调用全局 typed tool，并返回新项目的绝对路径。然后用 OpenCode 的
+打开文件夹功能打开这个目录；0.3 不承诺自动切换 GUI 工作区。在新项目中，让
+agent 检查 Co-Math 状态并开始 onboarding。
+
+项目 A 完成后，不要清空或重新初始化 A。直接让 OpenCode 创建项目 B，再打开
+B 返回的目录。每个项目都有独立的 `co-math.toml`、`workspace/`、agent adapters、
+研究历史和 Git 仓库，因此可以长期维护，也不会互相污染。
+
+以后继续旧项目时，打开该项目目录，让 OpenCode 从文件恢复状态即可。也可以在
+任意对话中让它列出所有已登记项目。对应 CLI 命令是：
+
+```bash
+co-math new "Muon Convergence" --language match
+co-math list
+co-math status --project ~/CoMathProjects/Muon\ Convergence
+co-math resume --project ~/CoMathProjects/Muon\ Convergence
+```
+
+旧目录只要已有合法 `workspace/`，就能在不移动、不重写研究文件的前提下接入：
+
+```bash
+co-math adopt /path/to/legacy-project
+```
+
+自动化测试通过不等于 OpenCode Desktop 真机行为已经验证。GUI 中的工具发现、
+自然语言创建、打开和恢复项目会作为单独的 smoke gate 记录。
+
+### 仓库内 Workspace 流程
+
+只有在开发 Co-Mathematician 本体，或明确需要旧版 checked-in workspace 时，
+才使用下面的流程。
 
 ### AI 自动 workspace setup
 
