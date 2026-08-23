@@ -1,0 +1,21 @@
+language_policy:
+  status: pending_user_choice
+  schema_language: English
+  project_docs_language: ""
+  notes_language: ""
+  review_language: English
+  final_output_language: ""
+research_question:
+  status: onboarding
+  text: ""
+goals: []
+
+# Example after user approval:
+# goals:
+#   - id: G1
+#     title: "Formalize baseline definitions"
+#     status: approved
+#     approved_by: user
+#     approved_at: "YYYY-MM-DDTHH:MM:SSZ"
+#     approval_id: "approval-G1-001"
+#     workstreams: []

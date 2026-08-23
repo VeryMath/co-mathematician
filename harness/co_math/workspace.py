@@ -82,6 +82,46 @@ DEFAULT_PROJECT_STATUS = """# Project Status
 No mathematical research project has started.
 """
 
+VALID_LANGUAGE_POLICIES = ("en", "user-notes", "user-readable", "match")
+LANGUAGE_POLICY_VALUES: dict[str, dict[str, str]] = {
+    "en": {
+        "status": "selected",
+        "code": "en",
+        "schema_language": "English",
+        "project_docs_language": "English",
+        "notes_language": "English",
+        "review_language": "English",
+        "final_output_language": "English",
+    },
+    "user-notes": {
+        "status": "selected",
+        "code": "user-notes",
+        "schema_language": "English",
+        "project_docs_language": "English",
+        "notes_language": "user_language",
+        "review_language": "English",
+        "final_output_language": "user_language",
+    },
+    "user-readable": {
+        "status": "selected",
+        "code": "user-readable",
+        "schema_language": "English",
+        "project_docs_language": "user_language",
+        "notes_language": "user_language",
+        "review_language": "user_language",
+        "final_output_language": "user_language",
+    },
+    "match": {
+        "status": "selected",
+        "code": "match",
+        "schema_language": "English",
+        "project_docs_language": "match_conversation",
+        "notes_language": "match_conversation",
+        "review_language": "match_conversation",
+        "final_output_language": "match_conversation",
+    },
+}
+
 GOAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 WORKSTREAM_ID_PATTERN = re.compile(
     r"^WS-(?P<goal>[A-Za-z0-9][A-Za-z0-9_-]{0,63})-"
@@ -104,6 +144,37 @@ def init_workspace(workspace: str | Path) -> Path:
     with workspace_lock(root):
         _refresh_project_status_unlocked(root)
     return root
+
+
+def select_language_policy(workspace: str | Path, policy: str) -> None:
+    if policy not in VALID_LANGUAGE_POLICIES:
+        raise ValueError(
+            "Unsupported language policy: "
+            f"{policy}. Choose one of: {', '.join(VALID_LANGUAGE_POLICIES)}"
+        )
+    root = Path(workspace)
+    with workspace_lock(root):
+        goals = load_goals(root)
+        goals["language_policy"] = dict(LANGUAGE_POLICY_VALUES[policy])
+        save_goals(root, goals)
+
+        project = resolve_managed_directory(root, "project")
+        project_md = resolve_managed_file(project, "PROJECT.md")
+        text = project_md.read_text(encoding="utf-8")
+        text = text.replace(
+            "Status: pending user choice.",
+            f"Status: selected (`{policy}`).",
+        )
+        prompt_start = text.find("Ask the user which language policy")
+        operating_rule = text.find("## Operating Rule")
+        if prompt_start >= 0 and operating_rule > prompt_start:
+            text = (
+                text[:prompt_start]
+                + f"The selected workspace language policy is `{policy}`.\n\n"
+                + text[operating_rule:]
+            )
+        atomic_write_text(project_md, text)
+        _refresh_project_status_unlocked(root)
 
 
 def new_workstream(

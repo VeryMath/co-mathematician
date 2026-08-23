@@ -24,6 +24,17 @@ include = ["harness*"]
 
 [tool.setuptools.package-data]
 "harness.co_math.assets" = ["*.json"]
+"harness.co_math.project_template" = [
+  "*.md",
+  "agents/*.md",
+  "agents/roles/*.md",
+  ".agents/skills/co-mathematician/*.md",
+  ".agents/skills/co-mathematician/assets/*",
+  ".codex/*.toml",
+  ".codex/agents/*.toml",
+  ".claude/agents/*.md",
+  ".cursor/rules/*.mdc",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]

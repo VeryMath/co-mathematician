@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Co-Mathematician Reviewer Output",
+  "type": "object",
+  "required": [
+    "approved",
+    "severity",
+    "issue_type",
+    "reviewer",
+    "reviewer_run_id",
+    "reviewed_at",
+    "report_sha256",
+    "comment",
+    "suggested_fix",
+    "resolves",
+    "checked_artifacts"
+  ],
+  "properties": {
+    "approved": {
+      "type": "boolean"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "blocking"]
+    },
+    "issue_type": {
+      "type": "string",
+      "enum": [
+        "logic",
+        "citation",
+        "code",
+        "exposition",
+        "missing_provenance",
+        "uncertainty"
+      ]
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "comment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suggested_fix": {
+      "type": "string"
+    },
+    "resolves": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^/\\\\]+\\.json$"
+      },
+      "default": []
+    },
+    "checked_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false
+}
