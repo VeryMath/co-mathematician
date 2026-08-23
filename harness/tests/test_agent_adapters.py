@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+PROJECT_TEMPLATE = ROOT / "harness" / "co_math" / "project_template"
 ROLE_IDS = {
     "workstream_coordinator",
     "proof_explorer",
@@ -42,9 +43,13 @@ def test_platform_adapters_cover_the_same_role_ids():
     claude_agents = {
         path.stem for path in (ROOT / ".claude" / "agents").glob("*.md")
     }
+    opencode_agents = {
+        path.stem for path in (ROOT / ".opencode" / "agents").glob("*.md")
+    }
 
     assert codex_agents == ROLE_IDS
     assert claude_agents == ROLE_IDS
+    assert opencode_agents == ROLE_IDS
 
     cursor_rules = (ROOT / ".cursor" / "rules" / "co-mathematician-roles.mdc").read_text(
         encoding="utf-8"
@@ -70,6 +75,32 @@ def test_adapters_point_back_to_canonical_role_cards():
         assert re.search(r"^---\n.*?^name: " + role_id + r"\n", claude_text, re.S | re.M)
         assert "description:" in claude_text
         assert "Read the canonical role card" in claude_text
+
+        opencode_text = (ROOT / ".opencode" / "agents" / f"{role_id}.md").read_text(
+            encoding="utf-8"
+        )
+        assert role_path in opencode_text
+        assert "mode: subagent" in opencode_text
+        assert "Do not mark any workstream complete." in opencode_text
+
+
+def test_packaged_opencode_adapters_cover_canonical_roles_and_reviewer_boundaries():
+    template_agents = PROJECT_TEMPLATE / ".opencode" / "agents"
+    assert {path.stem for path in template_agents.glob("*.md")} == ROLE_IDS
+
+    reviewer_ids = {"logic_reviewer", "adversarial_reviewer", "citation_checker"}
+    for role_id in ROLE_IDS:
+        text = (template_agents / f"{role_id}.md").read_text(encoding="utf-8")
+        assert "mode: subagent" in text
+        assert f"agents/roles/{role_id}.md" in text
+        assert "Do not mark any workstream complete." in text
+        if role_id in reviewer_ids:
+            assert "edit: deny" in text
+            assert "Do not approve a report authored by this same run." in text
+
+    synthesis = (template_agents / "synthesis_agent.md").read_text(encoding="utf-8")
+    assert "workspace/final/working_paper.md" in synthesis
+    assert "Do not write any other project file." in synthesis
 
 
 def test_codex_config_points_to_existing_agent_adapter_files():

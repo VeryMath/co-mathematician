@@ -49,6 +49,7 @@ def test_create_project_builds_self_contained_git_project(
     assert (root / ".codex/config.toml").is_file()
     assert (root / ".claude/agents/logic_reviewer.md").is_file()
     assert (root / ".cursor/rules/co-mathematician.mdc").is_file()
+    assert (root / ".opencode/agents/logic_reviewer.md").is_file()
     assert not (root / "harness").exists()
     assert (root / ".git").is_dir()
     assert load_goals(root / "workspace")["language_policy"] == {

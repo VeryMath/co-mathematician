@@ -34,6 +34,7 @@ include = ["harness*"]
   ".codex/agents/*.toml",
   ".claude/agents/*.md",
   ".cursor/rules/*.mdc",
+  ".opencode/agents/*.md",
 ]
 
 [tool.pytest.ini_options]
