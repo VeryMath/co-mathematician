@@ -36,6 +36,7 @@ include = ["harness*"]
   ".cursor/rules/*.mdc",
   ".opencode/agents/*.md",
 ]
+"harness.co_math.opencode_adapter" = ["*.ts"]
 
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]

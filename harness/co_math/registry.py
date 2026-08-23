@@ -67,7 +67,7 @@ def load_user_config() -> UserConfig:
 
 
 def save_user_config(config: UserConfig) -> UserConfig:
-    normalized = _normalize_user_config(config, create=True)
+    normalized = normalize_user_config(config, create=True)
     root = config_home()
     root.mkdir(parents=True, exist_ok=True)
     path = root / CONFIG_FILENAME
@@ -83,6 +83,20 @@ def save_user_config(config: UserConfig) -> UserConfig:
     with file_lock(root / ".config.lock"):
         atomic_write_json(path, data)
     return normalized
+
+
+def normalize_user_config(
+    config: UserConfig,
+    *,
+    create: bool = False,
+    require_existing: bool = False,
+) -> UserConfig:
+    """Validate and canonicalize user paths without persisting configuration."""
+    return _normalize_user_config(
+        config,
+        create=create,
+        require_existing=require_existing,
+    )
 
 
 def register_project(
