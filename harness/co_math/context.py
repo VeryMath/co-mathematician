@@ -7,7 +7,7 @@ from typing import Any
 
 from .gating import check_final_render, check_workstream_completion
 from .messages import read_messages
-from .project import ResolvedProject, resolve_project
+from .project import ResolvedProject, is_project_archived, resolve_project
 from .skill_handoff import read_skill_handoffs
 from .storage import resolve_managed_directory, resolve_managed_file
 from .workspace import (
@@ -68,9 +68,12 @@ def project_snapshot(
             "working_paper": working_paper,
             "render_gate_passed": final_gate.passed,
         }
+        snapshot["archived"] = is_project_archived(current)
 
         if snapshot["errors"]:
             snapshot["status"] = "invalid"
+        elif snapshot["archived"]:
+            snapshot["status"] = "archived"
         else:
             policy_status = str(
                 snapshot["language_policy"].get("status", "pending_user_choice")
@@ -89,32 +92,60 @@ def project_snapshot(
         snapshot["status"] = "invalid"
         snapshot["errors"].append(str(exc))
         snapshot["next_gate"] = "doctor"
+    snapshot["guidance"] = project_guidance(snapshot)
     return snapshot
 
 
 def render_resume_text(snapshot: Mapping[str, Any]) -> str:
-    project = snapshot.get("project", {})
-    goals = snapshot.get("goals", {})
-    workstreams = snapshot.get("workstreams", {})
+    summary = project_guidance(snapshot)
     lines = [
-        f"Co-Math project: {project.get('name', 'unknown')}",
-        f"Project ID: {project.get('project_id', 'unknown')}",
-        f"Path: {project.get('path', 'unknown')}",
-        f"Status: {snapshot.get('status', 'invalid')}",
-        "Goals: "
-        f"{len(goals.get('approved', []))} approved, "
-        f"{len(goals.get('draft', []))} draft",
-        "Workstreams: "
-        f"{len(workstreams.get('active', []))} active, "
-        f"{len(workstreams.get('blocked', []))} blocked, "
-        f"{len(workstreams.get('complete', []))} complete",
-        f"Next gate: {snapshot.get('next_gate', 'doctor')}",
+        f"Co-Math project: {summary['name']}",
+        f"Question: {summary['question']}",
+        f"Progress: {summary['progress']}",
     ]
-    errors = snapshot.get("errors", [])
-    if errors:
-        lines.append("Errors:")
-        lines.extend(f"- {error}" for error in errors)
+    if summary["recent_update"]:
+        lines.append(f"Recent: {summary['recent_update']}")
+    if summary["blocker"]:
+        lines.append(f"Blocked by: {summary['blocker']}")
+    lines.extend(
+        (
+            f"Next: {summary['next_action']}",
+            f"Path: {summary['path']}",
+        )
+    )
     return "\n".join(lines)
+
+
+def render_next_text(snapshot: Mapping[str, Any]) -> str:
+    summary = project_guidance(snapshot)
+    lines = [
+        f"{summary['name']}: {summary['current']}",
+    ]
+    if summary["blocker"]:
+        lines.append(f"Blocked by: {summary['blocker']}")
+    lines.append(f"Next: {summary['next_action']}")
+    return "\n".join(lines)
+
+
+def project_guidance(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    project = snapshot.get("project", {})
+    research_question = snapshot.get("research_question", {})
+    question = "Not confirmed yet."
+    if isinstance(research_question, Mapping):
+        text = str(research_question.get("text", "")).strip()
+        if text:
+            question = _short_text(text)
+    return {
+        "name": str(project.get("name", "unknown")),
+        "path": str(project.get("path", "unknown")),
+        "status": str(snapshot.get("status", "invalid")),
+        "current": _current_text(snapshot),
+        "question": question,
+        "progress": _progress_text(snapshot),
+        "recent_update": _recent_update(snapshot),
+        "blocker": _blocker_text(snapshot),
+        "next_action": _next_action_text(str(snapshot.get("next_gate", "doctor"))),
+    }
 
 
 def _empty_snapshot(project: ResolvedProject) -> dict[str, Any]:
@@ -130,6 +161,7 @@ def _empty_snapshot(project: ResolvedProject) -> dict[str, Any]:
             "template_version": project.manifest.template_version,
         },
         "status": "invalid",
+        "archived": False,
         "language_policy": {},
         "research_question": {},
         "goals": {"draft": [], "approved": [], "other": []},
@@ -142,6 +174,7 @@ def _empty_snapshot(project: ResolvedProject) -> dict[str, Any]:
             "render_gate_passed": False,
         },
         "next_gate": "doctor",
+        "guidance": {},
         "errors": [],
     }
 
@@ -276,10 +309,12 @@ def _next_gate(snapshot: Mapping[str, Any]) -> str:
     status = snapshot.get("status")
     if status == "invalid":
         return "doctor"
+    if status == "archived":
+        return "reopen_project"
     if status == "onboarding":
         return "onboarding"
     if status == "final_ready":
-        return "explicit_project_completion_unavailable"
+        return "archive_project"
 
     workstreams = snapshot["workstreams"]
     goals = snapshot["goals"]
@@ -307,3 +342,92 @@ def _next_gate(snapshot: Mapping[str, Any]) -> str:
     if goals["draft"]:
         return "goal_approval"
     return "goal_formalization"
+
+
+def _current_text(snapshot: Mapping[str, Any]) -> str:
+    status = str(snapshot.get("status", "invalid"))
+    return {
+        "archived": "The project is archived.",
+        "onboarding": "Project setup is still in progress.",
+        "active": "Research is in progress.",
+        "final_ready": "The working paper is ready.",
+        "invalid": "The project files need attention.",
+    }.get(status, "Project state is available.")
+
+
+def _progress_text(snapshot: Mapping[str, Any]) -> str:
+    if snapshot.get("status") == "archived":
+        return "All files are preserved; no work is currently active."
+    final = snapshot.get("final", {})
+    if isinstance(final, Mapping) and final.get("working_paper"):
+        return "The working paper exists."
+    goals = snapshot.get("goals", {})
+    workstreams = snapshot.get("workstreams", {})
+    approved = len(goals.get("approved", [])) if isinstance(goals, Mapping) else 0
+    draft = len(goals.get("draft", [])) if isinstance(goals, Mapping) else 0
+    active = len(workstreams.get("active", [])) if isinstance(workstreams, Mapping) else 0
+    blocked = len(workstreams.get("blocked", [])) if isinstance(workstreams, Mapping) else 0
+    complete = len(workstreams.get("complete", [])) if isinstance(workstreams, Mapping) else 0
+    if not any((approved, draft, active, blocked, complete)):
+        return "No goals or workstreams have started."
+    return (
+        f"{approved} approved goals; {active} active, {blocked} blocked, "
+        f"{complete} completed workstreams."
+    )
+
+
+def _recent_update(snapshot: Mapping[str, Any]) -> str:
+    messages = snapshot.get("recent_messages", [])
+    if not isinstance(messages, list):
+        return ""
+    preferred_types = {"artifact", "decision", "review", "status"}
+    for message in reversed(messages):
+        if not isinstance(message, Mapping):
+            continue
+        if str(message.get("type", "")) not in preferred_types:
+            continue
+        content = str(message.get("content", "")).strip()
+        if content:
+            return _short_text(content)
+    return ""
+
+
+def _blocker_text(snapshot: Mapping[str, Any]) -> str:
+    errors = snapshot.get("errors", [])
+    if isinstance(errors, list) and errors:
+        return _short_text(str(errors[0]))
+    workstreams = snapshot.get("workstreams", {})
+    blocked = workstreams.get("blocked", []) if isinstance(workstreams, Mapping) else []
+    if isinstance(blocked, list) and blocked:
+        titles = [
+            str(item.get("title") or item.get("id") or "workstream")
+            for item in blocked
+            if isinstance(item, Mapping)
+        ]
+        if titles:
+            return _short_text(", ".join(titles))
+    return ""
+
+
+def _next_action_text(next_gate: str) -> str:
+    return {
+        "doctor": "Run co-math doctor and address the first reported issue.",
+        "reopen_project": "Reopen the project when you want to continue.",
+        "onboarding": "Describe the research question and confirm the document language.",
+        "resolve_blocking_review": "Address the blocking review before continuing.",
+        "workstream_execution": "Continue the active workstream and update its report.",
+        "workstream_review": "Ask an independent reviewer to review the report.",
+        "final_render": "Assemble completed workstream reports into a draft.",
+        "synthesis": "Write or revise the final working paper.",
+        "workstream_creation": "Create a workstream for an approved goal.",
+        "goal_approval": "Review the draft goals and ask the user to approve or revise them.",
+        "goal_formalization": "Turn the research question into a small set of draft goals.",
+        "archive_project": "Review the working paper, then archive the project if finished.",
+    }.get(next_gate, "Inspect the project and choose the next useful action.")
+
+
+def _short_text(value: str, limit: int = 180) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."

@@ -103,8 +103,8 @@ cd co-mathematician
 python3 -m pip install -e .
 ```
 
-Install the global OpenCode tools and choose the parent directory for future
-projects:
+Install the global Co-Math Skill and OpenCode tools, then choose the parent
+directory for future projects:
 
 ```bash
 co-math install-opencode --projects-home ~/CoMathProjects
@@ -128,27 +128,28 @@ In any OpenCode conversation, ask:
 
 ```text
 Use Co-Math to create a project named Muon Convergence.
-Use the match document-language policy.
 ```
 
-OpenCode calls the global typed tool and returns an absolute project path. Use
-OpenCode's folder picker to open that path; version 0.3 does not claim to switch
-the GUI workspace automatically. In the newly opened project, ask the agent to
-inspect the Co-Math state and start onboarding.
+The global Skill uses the configured project home, matches the conversation
+language, and enables Git by default. OpenCode returns the new project path; use
+its folder picker to open that directory. Then ask it to start the project.
 
 When project A is finished, do not clear or reinitialize it. Ask OpenCode to
 create project B, then open B's returned directory. Each project has its own
 `co-math.toml`, `workspace/`, agent adapters, research history, and Git repository.
 
-To return later, open the project directory and ask OpenCode to resume from its
-files. You can also ask it to list all registered Co-Math projects. The equivalent
-CLI commands are:
+To return later, open the project directory and say "continue this project" or
+"what should I do next?" Archive a finished project without deleting its files.
+The equivalent CLI commands are:
 
 ```bash
 co-math new "Muon Convergence" --language match
 co-math list
 co-math status --project ~/CoMathProjects/Muon\ Convergence
 co-math resume --project ~/CoMathProjects/Muon\ Convergence
+co-math next --project ~/CoMathProjects/Muon\ Convergence
+co-math archive --project ~/CoMathProjects/Muon\ Convergence
+co-math reopen --project ~/CoMathProjects/Muon\ Convergence
 ```
 
 Adopt an older directory that already contains a valid `workspace/` without
@@ -157,10 +158,6 @@ moving or rewriting its research files:
 ```bash
 co-math adopt /path/to/legacy-project
 ```
-
-Passing automated tests does not by itself verify OpenCode Desktop behavior.
-The [Desktop smoke checklist](docs/opencode-desktop-smoke-test.md) records GUI
-tool discovery and natural-language create, open, and resume as a separate gate.
 
 ### Repository Workspace Setup
 

@@ -98,7 +98,7 @@ cd co-mathematician
 python3 -m pip install -e .
 ```
 
-安装 OpenCode 全局工具，并指定以后所有项目的父目录：
+安装全局 Co-Math Skill 和 OpenCode 工具，并指定以后所有项目的父目录：
 
 ```bash
 co-math install-opencode --projects-home ~/CoMathProjects
@@ -122,25 +122,26 @@ co-math install-opencode \
 
 ```text
 用 Co-Math 新建一个名为 Muon Convergence 的项目。
-文档语言策略使用 match。
 ```
 
-OpenCode 会调用全局 typed tool，并返回新项目的绝对路径。然后用 OpenCode 的
-打开文件夹功能打开这个目录；0.3 不承诺自动切换 GUI 工作区。在新项目中，让
-agent 检查 Co-Math 状态并开始 onboarding。
+全局 Skill 默认把项目放进设定的项目目录，语言跟随当前对话，并启用 Git。
+OpenCode 返回新项目路径后，用“打开文件夹”打开该目录，然后让它开始项目。
 
 项目 A 完成后，不要清空或重新初始化 A。直接让 OpenCode 创建项目 B，再打开
 B 返回的目录。每个项目都有独立的 `co-math.toml`、`workspace/`、agent adapters、
 研究历史和 Git 仓库，因此可以长期维护，也不会互相污染。
 
-以后继续旧项目时，打开该项目目录，让 OpenCode 从文件恢复状态即可。也可以在
-任意对话中让它列出所有已登记项目。对应 CLI 命令是：
+以后继续旧项目时，打开目录后说“继续这个项目”或“下一步做什么”。项目完成后
+可以归档，研究文件不会被删除。对应 CLI 命令是：
 
 ```bash
 co-math new "Muon Convergence" --language match
 co-math list
 co-math status --project ~/CoMathProjects/Muon\ Convergence
 co-math resume --project ~/CoMathProjects/Muon\ Convergence
+co-math next --project ~/CoMathProjects/Muon\ Convergence
+co-math archive --project ~/CoMathProjects/Muon\ Convergence
+co-math reopen --project ~/CoMathProjects/Muon\ Convergence
 ```
 
 旧目录只要已有合法 `workspace/`，就能在不移动、不重写研究文件的前提下接入：
@@ -148,10 +149,6 @@ co-math resume --project ~/CoMathProjects/Muon\ Convergence
 ```bash
 co-math adopt /path/to/legacy-project
 ```
-
-自动化测试通过不等于 OpenCode Desktop 真机行为已经验证。GUI 中的工具发现、
-自然语言创建、打开和恢复项目会在
-[Desktop smoke checklist](docs/opencode-desktop-smoke-test.md) 中作为独立 gate 记录。
 
 ### 仓库内 Workspace 流程
 

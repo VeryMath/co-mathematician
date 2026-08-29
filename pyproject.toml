@@ -37,7 +37,7 @@ exclude = ["harness.tests*"]
   ".cursor/rules/*.mdc",
   ".opencode/agents/*.md",
 ]
-"harness.co_math.opencode_adapter" = ["*.ts"]
+"harness.co_math.opencode_adapter" = ["*.ts", "*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]

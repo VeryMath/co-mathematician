@@ -3,8 +3,6 @@ import os from "node:os"
 import { readFile } from "node:fs/promises"
 
 type CoMathConfig = {
-  schema_version: number
-  core_version: string
   cli_path: string
   projects_home: string
   allowed_project_roots: string[]
@@ -14,7 +12,7 @@ const configUrl = new URL("./config.json", import.meta.url)
 
 async function loadConfig(): Promise<CoMathConfig> {
   const config = JSON.parse(await readFile(configUrl, "utf8")) as CoMathConfig
-  if (config.schema_version !== 1 || !path.isAbsolute(config.cli_path)) {
+  if (!path.isAbsolute(config.cli_path)) {
     throw new Error("Invalid Co-Math OpenCode adapter configuration")
   }
   if (!Array.isArray(config.allowed_project_roots) || config.allowed_project_roots.length === 0) {

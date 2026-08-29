@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .schemas import utc_timestamp
-from .storage import atomic_write_text
+from .storage import atomic_write_text, resolve_managed_directory
 
 try:  # pragma: no cover - Python version dependent
     import tomllib
@@ -21,6 +21,7 @@ MANIFEST_FILENAME = "co-math.toml"
 PROJECT_SCHEMA_VERSION = 1
 PROJECT_TEMPLATE_VERSION = 1
 CORE_VERSION = "0.3.0"
+ARCHIVE_FILENAME = "ARCHIVED.md"
 
 _MANIFEST_FIELDS = {
     "schema_version",
@@ -61,6 +62,32 @@ class ResolvedProject:
     root: Path
     workspace: Path
     manifest: ProjectManifest
+
+
+def is_project_archived(project: ResolvedProject) -> bool:
+    path = _archive_path(project)
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError(f"Project archive marker is unsafe: {path}")
+    return path.is_file()
+
+
+def archive_project(project: ResolvedProject) -> Path:
+    path = _archive_path(project)
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError(f"Project archive marker is unsafe: {path}")
+    atomic_write_text(
+        path,
+        "# Archived Project\n\n"
+        "This project is archived. Its research files remain unchanged.\n",
+    )
+    return path
+
+
+def reopen_project(project: ResolvedProject) -> None:
+    path = _archive_path(project)
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError(f"Project archive marker is unsafe: {path}")
+    path.unlink(missing_ok=True)
 
 
 def validate_project_name(name: str) -> str:
@@ -217,6 +244,11 @@ def _resolved_project(root: str | Path) -> ResolvedProject:
 def _manifest_path(path: str | Path) -> Path:
     candidate = Path(path)
     return candidate if candidate.name == MANIFEST_FILENAME else candidate / MANIFEST_FILENAME
+
+
+def _archive_path(project: ResolvedProject) -> Path:
+    project_dir = resolve_managed_directory(project.workspace, "project")
+    return project_dir / ARCHIVE_FILENAME
 
 
 def _validate_manifest_data(data: Mapping[str, Any]) -> ProjectManifest:

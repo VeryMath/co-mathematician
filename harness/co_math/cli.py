@@ -6,7 +6,12 @@ import shutil
 import sys
 from pathlib import Path
 
-from .context import project_snapshot, render_resume_text
+from .context import (
+    project_guidance,
+    project_snapshot,
+    render_next_text,
+    render_resume_text,
+)
 from .gating import check_gate
 from .messages import append_message
 from .opencode import (
@@ -14,7 +19,13 @@ from .opencode import (
     install_opencode_adapter,
     remove_opencode_adapter,
 )
-from .project import CORE_VERSION, ResolvedProject, resolve_project
+from .project import (
+    CORE_VERSION,
+    ResolvedProject,
+    archive_project,
+    reopen_project,
+    resolve_project,
+)
 from .registry import config_home, list_registered_projects, load_user_config
 from .reports import render_final
 from .reviews import submit_review
@@ -73,6 +84,23 @@ def build_parser() -> argparse.ArgumentParser:
     resume_parser.add_argument("--json", action="store_true")
     resume_parser.set_defaults(func=_cmd_project_resume)
 
+    next_parser = subparsers.add_parser("next", help="Show the next useful project action")
+    _add_project_target(next_parser)
+    next_parser.add_argument("--json", action="store_true")
+    next_parser.set_defaults(func=_cmd_project_next)
+
+    archive_parser = subparsers.add_parser(
+        "archive", help="Archive a project without deleting its files"
+    )
+    _add_project_target(archive_parser)
+    archive_parser.add_argument("--json", action="store_true")
+    archive_parser.set_defaults(func=_cmd_project_archive)
+
+    reopen_parser = subparsers.add_parser("reopen", help="Reopen an archived project")
+    _add_project_target(reopen_parser)
+    reopen_parser.add_argument("--json", action="store_true")
+    reopen_parser.set_defaults(func=_cmd_project_reopen)
+
     adopt_parser = subparsers.add_parser("adopt", help="Add an existing workspace as a project")
     adopt_parser.add_argument("path")
     adopt_parser.add_argument("--json", action="store_true")
@@ -86,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     install_opencode_parser = subparsers.add_parser(
         "install-opencode",
-        help="Install global Co-Math tools for OpenCode",
+        help="Install the global Co-Math Skill and OpenCode tools",
     )
     install_opencode_parser.add_argument("--config-dir")
     install_opencode_parser.add_argument("--cli-path")
@@ -101,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     uninstall_opencode_parser = subparsers.add_parser(
         "uninstall-opencode",
-        help="Remove managed global Co-Math tools from OpenCode",
+        help="Remove the global Co-Math Skill and OpenCode tools",
     )
     uninstall_opencode_parser.add_argument("--config-dir")
     uninstall_opencode_parser.add_argument("--json", action="store_true")
@@ -277,7 +305,8 @@ def _cmd_list_projects(args: argparse.Namespace) -> int:
         print("No registered Co-Math projects.")
         return 0
     for project in projects:
-        print(f"{project.get('name') or project['project_id']} [{project['status']}]")
+        name = project.get("name") or project["project_id"]
+        print(f"{name}: {project.get('current', project['status'])}")
         print(f"  {project['path']}")
     return 0
 
@@ -287,9 +316,10 @@ def _cmd_project_status(args: argparse.Namespace) -> int:
     if args.json:
         _print_json(snapshot)
     else:
-        print(f"{snapshot['project']['name']}: {snapshot['status']}")
+        guidance = project_guidance(snapshot)
+        print(f"{guidance['name']}: {guidance['current']}")
         print(f"Path: {snapshot['project']['path']}")
-        print(f"Next gate: {snapshot['next_gate']}")
+        print(f"Next: {guidance['next_action']}")
     return 0 if snapshot["status"] != "invalid" else 1
 
 
@@ -300,6 +330,39 @@ def _cmd_project_resume(args: argparse.Namespace) -> int:
     else:
         print(render_resume_text(snapshot))
     return 0 if snapshot["status"] != "invalid" else 1
+
+
+def _cmd_project_next(args: argparse.Namespace) -> int:
+    snapshot = project_snapshot(_required_project(args))
+    if args.json:
+        _print_json(project_guidance(snapshot))
+    else:
+        print(render_next_text(snapshot))
+    return 0 if snapshot["status"] != "invalid" else 1
+
+
+def _cmd_project_archive(args: argparse.Namespace) -> int:
+    project = _required_project(args)
+    archive_project(project)
+    snapshot = project_snapshot(project)
+    if args.json:
+        _print_json(project_guidance(snapshot))
+    else:
+        print(f"Archived Co-Math project: {project.manifest.name}")
+        print(f"Path: {project.root}")
+    return 0
+
+
+def _cmd_project_reopen(args: argparse.Namespace) -> int:
+    project = _required_project(args)
+    reopen_project(project)
+    snapshot = project_snapshot(project)
+    if args.json:
+        _print_json(project_guidance(snapshot))
+    else:
+        print(f"Reopened Co-Math project: {project.manifest.name}")
+        print(render_next_text(snapshot))
+    return 0
 
 
 def _cmd_adopt_project(args: argparse.Namespace) -> int:
@@ -416,13 +479,13 @@ def _cmd_install_opencode(args: argparse.Namespace) -> int:
         "tool_files": [str(path) for path in result.tool_files],
         "runner_file": str(result.runner_file),
         "config_file": str(result.config_file),
-        "manifest_file": str(result.manifest_file),
+        "skill_file": str(result.skill_file),
         "next_step": "Restart OpenCode, then ask it to create or list Co-Math projects.",
     }
     if args.json:
         _print_json(output)
     else:
-        print(f"Installed Co-Math OpenCode tools in: {result.config_dir}")
+        print(f"Installed the Co-Math Skill and OpenCode tools in: {result.config_dir}")
         print(output["next_step"])
     return 0
 
@@ -430,23 +493,22 @@ def _cmd_install_opencode(args: argparse.Namespace) -> int:
 def _cmd_uninstall_opencode(args: argparse.Namespace) -> int:
     result = remove_opencode_adapter(config_dir=args.config_dir)
     output = {
-        "installed": result.manifest_retained,
+        "installed": bool(result.preserved_files),
         "config_dir": str(result.config_dir),
         "removed_files": [str(path) for path in result.removed_files],
         "preserved_files": [str(path) for path in result.preserved_files],
         "warnings": list(result.warnings),
-        "manifest_retained": result.manifest_retained,
     }
     if args.json:
         _print_json(output)
     else:
-        if result.manifest_retained:
+        if result.preserved_files:
             print(
-                "Co-Math OpenCode uninstall is incomplete; managed files remain in: "
+                "Co-Math OpenCode uninstall is incomplete; unsafe paths remain in: "
                 f"{result.config_dir}"
             )
         else:
-            print(f"Removed managed Co-Math OpenCode tools from: {result.config_dir}")
+            print(f"Removed Co-Math OpenCode tools and Skill from: {result.config_dir}")
         for warning in result.warnings:
             print(f"WARNING: {warning}")
     return 0
@@ -676,6 +738,12 @@ def _listed_projects() -> list[dict[str, object]]:
         if registry_status != "valid":
             item["status"] = registry_status
             item["next_gate"] = "adopt" if registry_status == "stale" else "doctor"
+            item["current"] = "The saved project location needs attention."
+            item["next_action"] = (
+                "Adopt the project again from its current location."
+                if registry_status == "stale"
+                else "Run co-math doctor and address the first issue."
+            )
             results.append(item)
             continue
         try:
@@ -685,9 +753,13 @@ def _listed_projects() -> list[dict[str, object]]:
             snapshot = project_snapshot(project)
             item["status"] = snapshot["status"]
             item["next_gate"] = snapshot["next_gate"]
+            item["current"] = snapshot["guidance"]["current"]
+            item["next_action"] = snapshot["guidance"]["next_action"]
         except Exception as exc:
             item["status"] = "invalid"
             item["next_gate"] = "doctor"
+            item["current"] = "The project files need attention."
+            item["next_action"] = "Run co-math doctor and address the first issue."
             item["error"] = str(exc)
         results.append(item)
     return results

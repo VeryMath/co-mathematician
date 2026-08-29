@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Any, Sequence
 
-from .project import CORE_VERSION
 from .registry import (
     CONFIG_FILENAME,
     UserConfig,
@@ -16,29 +14,20 @@ from .registry import (
     normalize_user_config,
     save_user_config,
 )
-from .storage import atomic_write_json, atomic_write_text, file_lock, file_sha256
+from .storage import atomic_write_text, file_lock
 
 
-ADAPTER_SCHEMA_VERSION = 1
-INSTALL_MANIFEST_FILENAME = "install-manifest.json"
 TOOL_FILENAMES = (
     "comath_project_new.ts",
     "comath_project_list.ts",
     "comath_project_status.ts",
     "comath_project_resume.ts",
+    "comath_project_next.ts",
+    "comath_project_lifecycle.ts",
     "comath_project_adopt.ts",
 )
-RESOURCE_FILENAMES = ("runner.ts", *TOOL_FILENAMES)
-_INSTALL_MANIFEST_FIELDS = {"schema_version", "core_version", "files"}
-_INSTALL_FILE_FIELDS = {"path", "sha256"}
-_ADAPTER_CONFIG_FIELDS = {
-    "schema_version",
-    "core_version",
-    "cli_path",
-    "projects_home",
-    "allowed_project_roots",
-}
-_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+SKILL_RESOURCE_FILENAME = "co_math_skill.md"
+RESOURCE_FILENAMES = ("runner.ts", SKILL_RESOURCE_FILENAME, *TOOL_FILENAMES)
 
 
 @dataclass(frozen=True)
@@ -47,7 +36,7 @@ class OpenCodeInstallResult:
     tool_files: tuple[Path, ...]
     runner_file: Path
     config_file: Path
-    manifest_file: Path
+    skill_file: Path
 
 
 @dataclass(frozen=True)
@@ -56,7 +45,6 @@ class OpenCodeRemovalResult:
     removed_files: tuple[Path, ...]
     preserved_files: tuple[Path, ...]
     warnings: tuple[str, ...]
-    manifest_retained: bool
 
 
 @dataclass(frozen=True)
@@ -95,87 +83,29 @@ def install_opencode_adapter(
 ) -> OpenCodeInstallResult:
     root = resolve_opencode_config_dir(config_dir)
     executable = _resolve_executable(cli_path)
-    requested_user_config = UserConfig(
-        projects_home=Path(projects_home),
-        allowed_project_roots=tuple(Path(path) for path in allowed_roots),
-    )
     user_config = normalize_user_config(
-        requested_user_config,
+        UserConfig(
+            projects_home=Path(projects_home),
+            allowed_project_roots=tuple(Path(path) for path in allowed_roots),
+        ),
         create=False,
     )
-    if root.is_symlink():
-        raise ValueError(f"OpenCode config directory must not be a symlink: {root}")
     root.mkdir(parents=True, exist_ok=True)
-
-    config_data = {
-        "schema_version": ADAPTER_SCHEMA_VERSION,
-        "core_version": CORE_VERSION,
-        "cli_path": str(executable),
-        "projects_home": str(user_config.projects_home),
-        "allowed_project_roots": [
-            str(path) for path in user_config.allowed_project_roots
-        ],
-    }
-    desired = {
-        **{
-            f"tools/{filename}": adapter_resource_text(filename)
-            for filename in TOOL_FILENAMES
-        },
-        "co-math/runner.ts": adapter_resource_text("runner.ts"),
-        "co-math/config.json": json.dumps(
-            config_data,
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-    }
-    manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
-    core_config_root = core_config_home()
+    desired = _desired_files(executable, user_config)
 
     with file_lock(root / ".co-math-adapter.lock"):
-        if manifest_path.is_symlink():
-            raise ValueError(
-                f"OpenCode adapter install manifest must not be a symlink: {manifest_path}"
-            )
-        previous = _read_install_manifest(manifest_path) if manifest_path.exists() else None
-        previous_digests = _manifest_digest_map(previous) if previous is not None else {}
-        _check_safe_overwrite(root, desired, previous_digests)
-        with file_lock(core_config_root / ".config.lock"):
-            core_config_snapshot = _snapshot_text_file(
-                core_config_root / CONFIG_FILENAME
-            )
-            snapshots = _snapshot_managed_files(
-                root,
-                (*desired, f"co-math/{INSTALL_MANIFEST_FILENAME}"),
-            )
-            try:
-                for relative_path, text in desired.items():
-                    target = _managed_target(root, relative_path)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    atomic_write_text(target, text)
-                manifest = _build_install_manifest(root, desired)
-                atomic_write_json(manifest_path, manifest)
-                save_user_config(
-                    UserConfig(
-                        projects_home=user_config.projects_home,
-                        allowed_project_roots=user_config.allowed_project_roots,
-                    )
-                )
-            except Exception as exc:
-                rollback_errors = list(_restore_managed_files(root, snapshots))
-                try:
-                    _restore_text_file(core_config_snapshot)
-                except Exception as rollback_exc:  # pragma: no cover
-                    rollback_errors.append(
-                        f"{core_config_snapshot.path}: {rollback_exc}"
-                    )
-                if rollback_errors:
-                    details = "; ".join(rollback_errors)
-                    raise RuntimeError(
-                        "OpenCode adapter installation failed and rollback was "
-                        f"incomplete: {details}"
-                    ) from exc
-                raise
+        snapshots = _snapshot_managed_files(root, tuple(desired))
+        core_snapshot = _snapshot_text_file(core_config_home() / CONFIG_FILENAME)
+        try:
+            for relative_path, content in desired.items():
+                target = _managed_target(root, relative_path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(target, content)
+            save_user_config(user_config)
+        except Exception:
+            _restore_managed_files(root, snapshots)
+            _restore_text_file(core_snapshot)
+            raise
 
     return _install_result(root)
 
@@ -185,48 +115,38 @@ def remove_opencode_adapter(
     config_dir: str | Path | None = None,
 ) -> OpenCodeRemovalResult:
     root = resolve_opencode_config_dir(config_dir)
-    manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
-    if not manifest_path.exists():
-        return OpenCodeRemovalResult(root, (), (), (), False)
-
     removed: list[Path] = []
     preserved: list[Path] = []
     warnings: list[str] = []
+    if not root.exists():
+        return OpenCodeRemovalResult(root, (), (), ())
+
     with file_lock(root / ".co-math-adapter.lock"):
-        manifest = _read_install_manifest(manifest_path)
-        for relative_path, expected_digest in _manifest_digest_map(manifest).items():
+        for relative_path in _managed_relative_paths():
             target = _managed_target(root, relative_path)
             if not target.exists() and not target.is_symlink():
                 continue
             if target.is_symlink() or not target.is_file():
                 preserved.append(target)
-                warnings.append(f"Preserved unsafe managed path: {target}")
-                continue
-            if file_sha256(target) != expected_digest:
-                preserved.append(target)
-                warnings.append(f"Preserved modified managed file: {target}")
+                warnings.append(f"Preserved unsafe Co-Math path: {target}")
                 continue
             target.unlink()
             removed.append(target)
-        manifest_retained = bool(preserved)
-        if manifest_retained:
-            warnings.append(
-                "Retained the install manifest because modified or unsafe managed "
-                "files remain"
-            )
-        else:
-            manifest_path.unlink(missing_ok=True)
-        for directory in (root / "co-math", root / "tools"):
+        for directory in (
+            root / "skills" / "co-math",
+            root / "co-math",
+            root / "tools",
+        ):
             try:
                 directory.rmdir()
             except OSError:
                 pass
+
     return OpenCodeRemovalResult(
         config_dir=root,
         removed_files=tuple(sorted(removed)),
         preserved_files=tuple(sorted(preserved)),
         warnings=tuple(warnings),
-        manifest_retained=manifest_retained,
     )
 
 
@@ -235,77 +155,79 @@ def inspect_opencode_adapter(
     config_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     root = resolve_opencode_config_dir(config_dir)
-    manifest_path = root / "co-math" / INSTALL_MANIFEST_FILENAME
+    targets = [_managed_target(root, path) for path in _managed_relative_paths()]
+    installed = any(path.exists() or path.is_symlink() for path in targets)
     result: dict[str, Any] = {
         "config_dir": str(root),
-        "installed": manifest_path.is_file() and not manifest_path.is_symlink(),
+        "installed": installed,
         "healthy": False,
-        "core_version": None,
-        "core_version_matches": False,
         "cli_path": None,
         "cli_exists": False,
-        "cli_path_matches": False,
-        "files": [],
+        "skill_file": str(root / "skills" / "co-math" / "SKILL.md"),
+        "files": [str(path) for path in targets],
         "issues": [],
     }
-    if not result["installed"]:
+    if not installed:
         return result
-    try:
-        manifest = _read_install_manifest(manifest_path)
-        result["core_version"] = manifest["core_version"]
-        manifest_version_matches = manifest["core_version"] == CORE_VERSION
-        if not manifest_version_matches:
-            result["issues"].append(
-                "OpenCode adapter Core version mismatch: "
-                f"installed {manifest['core_version']}, current {CORE_VERSION}"
-            )
-        for relative_path, expected_digest in _manifest_digest_map(manifest).items():
-            target = _managed_target(root, relative_path)
-            result["files"].append(str(target))
-            if target.is_symlink() or not target.is_file():
-                result["issues"].append(f"Managed adapter file is missing or unsafe: {target}")
-            elif file_sha256(target) != expected_digest:
-                result["issues"].append(f"Managed adapter file digest mismatch: {target}")
-        config_path = root / "co-math" / "config.json"
-        if config_path.is_file() and not config_path.is_symlink():
+
+    for target in targets:
+        if target.is_symlink() or not target.is_file():
+            result["issues"].append(f"Co-Math OpenCode file is missing or unsafe: {target}")
+
+    config_path = root / "co-math" / "config.json"
+    if config_path.is_file() and not config_path.is_symlink():
+        try:
             config = json.loads(config_path.read_text(encoding="utf-8"))
-            if not isinstance(config, dict) or set(config) != _ADAPTER_CONFIG_FIELDS:
-                raise ValueError("Invalid OpenCode adapter config fields")
-            config_version = config.get("core_version")
-            config_version_matches = config_version == CORE_VERSION
-            result["core_version_matches"] = (
-                manifest_version_matches and config_version_matches
-            )
-            if not config_version_matches:
+            if not isinstance(config, dict):
+                raise ValueError("OpenCode config must contain an object")
+            cli_path = config.get("cli_path")
+            if not isinstance(cli_path, str) or not Path(cli_path).is_absolute():
+                raise ValueError("OpenCode config is missing an absolute cli_path")
+            result["cli_path"] = cli_path
+            candidate = Path(cli_path)
+            result["cli_exists"] = candidate.is_file() and os.access(candidate, os.X_OK)
+            if not result["cli_exists"]:
                 result["issues"].append(
-                    "OpenCode adapter config Core version mismatch: "
-                    f"installed {config_version!r}, current {CORE_VERSION}"
+                    f"Configured Co-Math executable is missing or not executable: {candidate}"
                 )
-            cli_path = config.get("cli_path") if isinstance(config, dict) else None
-            if isinstance(cli_path, str):
-                result["cli_path"] = cli_path
-                candidate = Path(cli_path)
-                result["cli_exists"] = candidate.is_file() and os.access(candidate, os.X_OK)
-                if not result["cli_exists"]:
-                    result["issues"].append(
-                        f"Configured Co-Math executable is missing or not executable: {candidate}"
-                    )
-                elif not candidate.is_absolute() or candidate.resolve(strict=True) != candidate:
-                    result["issues"].append(
-                        f"Configured Co-Math executable path is not canonical: {candidate}"
-                    )
-                else:
-                    result["cli_path_matches"] = result["core_version_matches"]
-            else:
-                result["issues"].append("Adapter config is missing cli_path")
-        else:
-            result["issues"].append(
-                f"OpenCode adapter config is missing or unsafe: {config_path}"
-            )
-    except Exception as exc:
-        result["issues"].append(str(exc))
+            roots = config.get("allowed_project_roots")
+            if not isinstance(roots, list) or not roots or not all(
+                isinstance(item, str) and Path(item).is_absolute() for item in roots
+            ):
+                result["issues"].append(
+                    "OpenCode config needs at least one absolute allowed project root"
+                )
+        except (json.JSONDecodeError, ValueError) as exc:
+            result["issues"].append(str(exc))
+
     result["healthy"] = not result["issues"]
     return result
+
+
+def _desired_files(executable: Path, config: UserConfig) -> dict[str, str]:
+    config_data = {
+        "cli_path": str(executable),
+        "projects_home": str(config.projects_home),
+        "allowed_project_roots": [str(path) for path in config.allowed_project_roots],
+    }
+    return {
+        **{
+            f"tools/{filename}": adapter_resource_text(filename)
+            for filename in TOOL_FILENAMES
+        },
+        "co-math/runner.ts": adapter_resource_text("runner.ts"),
+        "co-math/config.json": json.dumps(config_data, ensure_ascii=False, indent=2) + "\n",
+        "skills/co-math/SKILL.md": adapter_resource_text(SKILL_RESOURCE_FILENAME),
+    }
+
+
+def _managed_relative_paths() -> tuple[str, ...]:
+    return (
+        *(f"tools/{filename}" for filename in TOOL_FILENAMES),
+        "co-math/runner.ts",
+        "co-math/config.json",
+        "skills/co-math/SKILL.md",
+    )
 
 
 def _resolve_executable(cli_path: str | Path) -> Path:
@@ -329,17 +251,15 @@ def _managed_target(root: Path, relative_path: str) -> Path:
         or not relative.parts
         or any(part in {"", ".", ".."} for part in relative.parts)
     ):
-        raise ValueError(f"Invalid adapter managed path: {relative_path}")
+        raise ValueError(f"Invalid OpenCode path: {relative_path}")
     target = root.joinpath(*relative.parts)
     current = root
     for part in relative.parts[:-1]:
         current /= part
         if current.is_symlink():
-            raise ValueError(f"Adapter managed path contains a symlink: {current}")
+            raise ValueError(f"OpenCode path contains a symlink: {current}")
         if current.exists() and not current.is_dir():
-            raise ValueError(
-                f"Adapter managed parent must be a directory: {current}"
-            )
+            raise ValueError(f"OpenCode path parent must be a directory: {current}")
     return target
 
 
@@ -347,11 +267,10 @@ def _snapshot_managed_files(
     root: Path,
     relative_paths: Sequence[str],
 ) -> tuple[_ManagedFileSnapshot, ...]:
-    snapshots: list[_ManagedFileSnapshot] = []
-    for relative_path in relative_paths:
-        target = _managed_target(root, relative_path)
-        snapshots.append(_snapshot_text_file(target))
-    return tuple(snapshots)
+    return tuple(
+        _snapshot_text_file(_managed_target(root, relative_path))
+        for relative_path in relative_paths
+    )
 
 
 def _snapshot_text_file(path: Path) -> _ManagedFileSnapshot:
@@ -366,26 +285,21 @@ def _restore_text_file(snapshot: _ManagedFileSnapshot) -> None:
         if snapshot.path.is_symlink() or snapshot.path.is_file():
             snapshot.path.unlink()
         elif snapshot.path.exists():
-            raise ValueError(f"Rollback target is not a file: {snapshot.path}")
+            raise ValueError(f"Restore target is not a file: {snapshot.path}")
         return
     if snapshot.path.is_symlink() or (
         snapshot.path.exists() and not snapshot.path.is_file()
     ):
-        raise ValueError(f"Rollback target is unsafe: {snapshot.path}")
+        raise ValueError(f"Restore target is unsafe: {snapshot.path}")
     atomic_write_text(snapshot.path, snapshot.content)
 
 
 def _restore_managed_files(
     root: Path,
     snapshots: Sequence[_ManagedFileSnapshot],
-) -> tuple[str, ...]:
-    errors: list[str] = []
+) -> None:
     for snapshot in reversed(snapshots):
-        try:
-            _restore_text_file(snapshot)
-        except Exception as exc:  # pragma: no cover - requires rollback failure
-            errors.append(f"{snapshot.path}: {exc}")
-
+        _restore_text_file(snapshot)
     directories = {
         snapshot.path.parent
         for snapshot in snapshots
@@ -396,79 +310,6 @@ def _restore_managed_files(
             directory.rmdir()
         except OSError:
             pass
-    return tuple(errors)
-
-
-def _check_safe_overwrite(
-    root: Path,
-    desired: dict[str, str],
-    previous_digests: dict[str, str],
-) -> None:
-    for relative_path, text in desired.items():
-        target = _managed_target(root, relative_path)
-        if not target.exists() and not target.is_symlink():
-            continue
-        if target.is_symlink() or not target.is_file():
-            raise ValueError(f"Refusing to overwrite unsafe adapter path: {target}")
-        current_digest = file_sha256(target)
-        desired_digest = _text_sha256(text)
-        if current_digest == desired_digest:
-            continue
-        if previous_digests.get(relative_path) == current_digest:
-            continue
-        raise ValueError(f"Refusing to overwrite modified adapter file: {target}")
-
-
-def _build_install_manifest(root: Path, desired: dict[str, str]) -> dict[str, Any]:
-    return {
-        "schema_version": ADAPTER_SCHEMA_VERSION,
-        "core_version": CORE_VERSION,
-        "files": [
-            {
-                "path": relative_path,
-                "sha256": file_sha256(_managed_target(root, relative_path)),
-            }
-            for relative_path in sorted(desired)
-        ],
-    }
-
-
-def _read_install_manifest(path: Path) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file():
-        raise ValueError(f"OpenCode adapter install manifest is missing or unsafe: {path}")
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid OpenCode adapter install manifest JSON: {exc}") from exc
-    if not isinstance(data, dict) or set(data) != _INSTALL_MANIFEST_FIELDS:
-        raise ValueError("Invalid OpenCode adapter install manifest fields")
-    if data.get("schema_version") != ADAPTER_SCHEMA_VERSION:
-        raise ValueError("Invalid OpenCode adapter install manifest schema_version")
-    if not isinstance(data.get("core_version"), str) or not data["core_version"]:
-        raise ValueError("Invalid OpenCode adapter install manifest core_version")
-    files = data.get("files")
-    if not isinstance(files, list):
-        raise ValueError("Invalid OpenCode adapter install manifest files")
-    seen: set[str] = set()
-    for record in files:
-        if not isinstance(record, dict) or set(record) != _INSTALL_FILE_FIELDS:
-            raise ValueError("Invalid OpenCode adapter install file record")
-        relative_path = record.get("path")
-        digest = record.get("sha256")
-        if not isinstance(relative_path, str) or relative_path in seen:
-            raise ValueError("Invalid or duplicate OpenCode adapter install path")
-        _managed_target(path.parents[1], relative_path)
-        if not isinstance(digest, str) or not _SHA256_PATTERN.fullmatch(digest):
-            raise ValueError("Invalid OpenCode adapter install digest")
-        seen.add(relative_path)
-    return data
-
-
-def _manifest_digest_map(manifest: dict[str, Any]) -> dict[str, str]:
-    return {
-        str(record["path"]): str(record["sha256"])
-        for record in manifest["files"]
-    }
 
 
 def _install_result(root: Path) -> OpenCodeInstallResult:
@@ -477,11 +318,5 @@ def _install_result(root: Path) -> OpenCodeInstallResult:
         tool_files=tuple(root / "tools" / filename for filename in TOOL_FILENAMES),
         runner_file=root / "co-math" / "runner.ts",
         config_file=root / "co-math" / "config.json",
-        manifest_file=root / "co-math" / INSTALL_MANIFEST_FILENAME,
+        skill_file=root / "skills" / "co-math" / "SKILL.md",
     )
-
-
-def _text_sha256(text: str) -> str:
-    import hashlib
-
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
