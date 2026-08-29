@@ -12,11 +12,15 @@ const configUrl = new URL("./config.json", import.meta.url)
 
 async function loadConfig(): Promise<CoMathConfig> {
   const config = JSON.parse(await readFile(configUrl, "utf8")) as CoMathConfig
-  if (!path.isAbsolute(config.cli_path)) {
+  if (!path.isAbsolute(config.cli_path) || !path.isAbsolute(config.projects_home)) {
     throw new Error("Invalid Co-Math OpenCode adapter configuration")
   }
-  if (!Array.isArray(config.allowed_project_roots) || config.allowed_project_roots.length === 0) {
-    throw new Error("Co-Math allowed_project_roots is empty")
+  if (
+    !Array.isArray(config.allowed_project_roots) ||
+    config.allowed_project_roots.length === 0 ||
+    !config.allowed_project_roots.every((root) => typeof root === "string" && path.isAbsolute(root))
+  ) {
+    throw new Error("Co-Math allowed project roots must be absolute paths")
   }
   return config
 }

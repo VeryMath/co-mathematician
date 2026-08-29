@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .schemas import utc_timestamp
-from .storage import atomic_write_text, resolve_managed_directory
+from .storage import atomic_write_text, resolve_managed_directory, workspace_lock
 
 try:  # pragma: no cover - Python version dependent
     import tomllib
@@ -72,22 +72,24 @@ def is_project_archived(project: ResolvedProject) -> bool:
 
 
 def archive_project(project: ResolvedProject) -> Path:
-    path = _archive_path(project)
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise ValueError(f"Project archive marker is unsafe: {path}")
-    atomic_write_text(
-        path,
-        "# Archived Project\n\n"
-        "This project is archived. Its research files remain unchanged.\n",
-    )
+    with workspace_lock(project.workspace):
+        path = _archive_path(project)
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise ValueError(f"Project archive marker is unsafe: {path}")
+        atomic_write_text(
+            path,
+            "# Archived Project\n\n"
+            "This project is archived. Its research files remain unchanged.\n",
+        )
     return path
 
 
 def reopen_project(project: ResolvedProject) -> None:
-    path = _archive_path(project)
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise ValueError(f"Project archive marker is unsafe: {path}")
-    path.unlink(missing_ok=True)
+    with workspace_lock(project.workspace):
+        path = _archive_path(project)
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise ValueError(f"Project archive marker is unsafe: {path}")
+        path.unlink(missing_ok=True)
 
 
 def validate_project_name(name: str) -> str:
