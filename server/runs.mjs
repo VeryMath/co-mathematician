@@ -1,3 +1,15 @@
+function historyExcerpt(content, allowance) {
+  if (content.length <= allowance) return content;
+  const marker = '\n\n[历史消息节选：中间内容已省略]\n\n';
+  const available = allowance - marker.length;
+  let headEnd = Math.ceil(available / 2);
+  let tailStart = content.length - Math.floor(available / 2);
+  // Keep Unicode characters intact at both excerpt boundaries.
+  if (/[\uD800-\uDBFF]/.test(content[headEnd - 1])) headEnd--;
+  if (/[\uDC00-\uDFFF]/.test(content[tailStart])) tailStart++;
+  return content.slice(0, headEnd) + marker + content.slice(tailStart);
+}
+
 export class Runs {
   constructor(core, model) {
     this.core = core; this.model = model;
@@ -52,13 +64,32 @@ export class Runs {
         materialBudget -= excerpt.length;
       }
       const conversation = await this.core.call('chat.read', { projectId });
+      const turns = [];
+      for (const message of conversation.messages.slice(-12)) {
+        if (message.role === 'assistant' && message.status !== 'succeeded') continue;
+        if (message.role === 'user' || !turns.length) turns.push([]);
+        turns.at(-1).push({ role: message.role, content: message.content });
+      }
       const history = [];
       let remaining = skill ? 6000 : 12000;
-      for (const message of conversation.messages.slice(-12).reverse()) {
-        if (message.role === 'assistant' && message.status !== 'succeeded') continue;
-        if (message.content.length > remaining) break;
-        history.unshift({ role: message.role, content: message.content });
-        remaining -= message.content.length;
+      for (const turn of turns.reverse()) {
+        const length = turn.reduce((total, message) => total + message.content.length, 0);
+        if (length > remaining) {
+          if (history.length) break;
+          // Preserve the latest question and answer together. Short messages keep
+          // their full text; longer ones share the remaining character budget.
+          const allowances = new Map();
+          [...turn].sort((a, b) => a.content.length - b.content.length).forEach((message, index) => {
+            const allowance = Math.min(message.content.length, Math.floor(remaining / (turn.length - index)));
+            allowances.set(message, allowance);
+            remaining -= allowance;
+          });
+          history.push(...turn.map(message => ({ ...message, content: historyExcerpt(message.content, allowances.get(message)) })));
+          sourceNotes.push('历史对话：最近一轮较长，本次仅使用开头和结尾节选；完整记录仍保存在项目中。');
+          break;
+        }
+        history.unshift(...turn);
+        remaining -= length;
       }
       controller.signal.throwIfAborted();
       const skillInfo = skill ? { source: skill.source, path: skill.path, name: skill.name, title: skill.title, mode: skill.mode, resources: skill.resources.map(resource => resource.path), warnings: skill.warnings } : undefined;
