@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.19.0', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        run: npm install --package-lock=false
+      - name: Conversation history regression tests
+        run: node --test tests/runs-history.test.mjs
+      - name: TypeScript type check
+        run: npm run check
+      - name: Web production build
+        run: npm run build
+
+  python:
+    name: Python / ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install package
+        run: python -m pip install .
+      - name: Check installed dependencies
+        run: python -m pip check
+      - name: Check installed CLI and project resources
+        working-directory: ${{ runner.temp }}
+        env:
+          CO_MATH_CONFIG_HOME: ${{ runner.temp }}/co-math-config
+        run: |
+          co-math --help
+          python -m harness.co_math.cli --help
+          co-math new ci-smoke --projects-home "$PWD/ci-projects" --no-git --json
+          co-math list --projects-home "$PWD/ci-projects" --json
+          co-math status --project "$PWD/ci-projects/ci-smoke" --json
