@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -82,9 +84,13 @@ def check_gate(
 
 def _selected_workstreams(root: Path, workstream_id: str | None) -> list[Path]:
     workstreams_dir = root / "workstreams"
+    if workstreams_dir.is_symlink():
+        return []
     if workstream_id:
+        if Path(workstream_id).name != workstream_id or workstream_id in {".", ".."}:
+            return []
         path = workstreams_dir / workstream_id
-        return [path] if path.exists() else []
+        return [path] if path.is_dir() and not path.is_symlink() else []
     if not workstreams_dir.exists():
         return []
     return sorted(
@@ -101,15 +107,23 @@ def _workstream_issues(workstream: Path) -> list[str]:
     report = workstream / "report.md"
     reviews = _load_reviews(workstream)
 
-    if not report.exists():
+    if not status:
+        issues.append(f"{label}: status.yaml is missing or invalid.")
+    elif str(status.get("status", "")).lower() != "complete":
+        issues.append(f"{label}: status.yaml is not marked complete.")
+
+    if not _regular_file(report):
         issues.append(f"{label}: report.md is missing.")
 
+    report_hash = _sha256(report) if _regular_file(report) else None
+
     approved_reviewers = [
-        review.get("reviewer", path.stem)
+        str(review.get("reviewer", "")).strip()
         for path, review in reviews
-        if review.get("approved") is True
+        if review.get("approved") is True and isinstance(review.get("reviewer"), str)
     ]
-    coordinator = status.get("coordinator", "workstream_coordinator")
+    coordinator_value = status.get("coordinator")
+    coordinator = coordinator_value.strip() if isinstance(coordinator_value, str) else ""
     independent_approvals = [
         reviewer for reviewer in approved_reviewers if reviewer != coordinator
     ]
@@ -118,12 +132,14 @@ def _workstream_issues(workstream: Path) -> list[str]:
 
     resolved_reviews = _resolved_review_names(reviews)
     for path, review in reviews:
+        if review.get("report_sha256") != report_hash:
+            issues.append(f"{label}: review in {path.name} is not bound to the current report.")
         if review.get("severity") == "blocking" and not _review_is_resolved(
             path, review, resolved_reviews
         ):
             issues.append(f"{label}: blocking review in {path.name}.")
 
-    if report.exists():
+    if _regular_file(report):
         text = report.read_text(encoding="utf-8")
         if not _has_section(text, "Provenance"):
             issues.append(f"{label}: report.md is missing a Provenance section.")
@@ -137,7 +153,7 @@ def _workstream_issues(workstream: Path) -> list[str]:
 
 def _load_status(workstream: Path) -> dict[str, Any]:
     path = workstream / "status.yaml"
-    if path.exists():
+    if _regular_file(path):
         data = read_yaml(path)
         return data if isinstance(data, dict) else {}
     return {}
@@ -145,14 +161,59 @@ def _load_status(workstream: Path) -> dict[str, Any]:
 
 def _load_reviews(workstream: Path) -> list[tuple[Path, dict[str, Any]]]:
     reviews_dir = workstream / "reviews"
-    if not reviews_dir.exists():
+    if reviews_dir.is_symlink() or not reviews_dir.is_dir():
         return []
     reviews = []
     for path in sorted(reviews_dir.glob("*.json")):
+        if not _regular_file(path):
+            reviews.append((path, {"_invalid": "Review must be a regular file."}))
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            data = {"severity": "blocking", "comment": "Review JSON is invalid."}
+            if not isinstance(data, dict):
+                raise ValueError("review must be a JSON object")
+            required = {
+                "approved",
+                "severity",
+                "issue_type",
+                "reviewer",
+                "comment",
+                "suggested_fix",
+                "report_sha256",
+            }
+            optional = {"resolves", "resolved"}
+            if not required.issubset(data) or set(data) - required - optional:
+                raise ValueError("review has missing or unknown fields")
+            if not isinstance(data["approved"], bool) or data["severity"] not in {"blocking", "major", "minor", "none"}:
+                raise ValueError("review has invalid approval or severity")
+            if not all(
+                isinstance(data[field], str) and data[field].strip()
+                for field in (
+                    "issue_type",
+                    "reviewer",
+                    "comment",
+                    "suggested_fix",
+                    "report_sha256",
+                )
+            ):
+                raise ValueError("review text fields must be non-empty strings")
+            report_sha256 = data["report_sha256"]
+            if not re.fullmatch(r"[0-9a-f]{64}", report_sha256):
+                raise ValueError("report_sha256 must be a SHA-256 hex digest")
+            if "resolved" in data and not isinstance(data["resolved"], bool):
+                raise ValueError("resolved must be a boolean")
+            if "resolves" in data:
+                resolves = data["resolves"]
+                if not isinstance(resolves, list) or not all(
+                    isinstance(target, str)
+                    and target.endswith(".json")
+                    and Path(target).name == target
+                    and target not in {".", ".."}
+                    for target in resolves
+                ):
+                    raise ValueError("resolves must contain review filenames in this directory")
+        except (json.JSONDecodeError, ValueError):
+            data = {"_invalid": "Review JSON is invalid or has an invalid schema.", "severity": "blocking"}
         reviews.append((path, data))
     return reviews
 
@@ -166,6 +227,11 @@ def _is_workstream_dir(path: Path) -> bool:
 
 def _resolved_review_names(reviews: list[tuple[Path, dict[str, Any]]]) -> set[str]:
     resolved: set[str] = set()
+    review_names = {
+        key
+        for path, _review in reviews
+        for key in (path.name, path.stem)
+    }
     for path, review in reviews:
         if review.get("resolved") is True:
             resolved.update((path.name, path.stem))
@@ -173,7 +239,7 @@ def _resolved_review_names(reviews: list[tuple[Path, dict[str, Any]]]) -> set[st
         if not isinstance(resolves, list):
             continue
         for target in resolves:
-            if not isinstance(target, str) or not target.strip():
+            if not isinstance(target, str) or target not in review_names:
                 continue
             target_path = Path(target.strip())
             resolved.update((target.strip(), target_path.name, target_path.stem))
@@ -193,3 +259,15 @@ def _review_is_resolved(
 def _has_section(text: str, section: str) -> bool:
     expected = f"## {section}".lower()
     return any(line.strip().lower() == expected for line in text.splitlines())
+
+
+def _regular_file(path: Path) -> bool:
+    return not path.is_symlink() and path.is_file()
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
