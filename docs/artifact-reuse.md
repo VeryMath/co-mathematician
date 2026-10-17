@@ -1,5 +1,7 @@
 # Reusing Workstream Inputs
 
+English | [中文说明](artifact-reuse.zh-CN.md)
+
 Keep an upstream result at its existing workspace path and read it from there.
 New workstreams can record those paths without copying the files:
 

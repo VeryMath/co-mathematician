@@ -393,7 +393,7 @@ co-math new-workstream \
 需要复用上游文件时，为命令添加 `--input <相对于 workspace 的路径>`，多个文件可
 重复添加。新 workstream 会在 `inputs.md` 记录相对链接，直接读取已有文件。
 共享输入保持不变，新输出放在当前 workstream 的 `artifacts/` 下。示例和已有项目的
-处理方式见[输入文件复用说明](docs/artifact-reuse.md)。
+处理方式见[输入文件复用说明](docs/artifact-reuse.zh-CN.md)。
 
 每个 workstream report 应包含：
 
