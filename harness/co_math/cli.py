@@ -120,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
     ws_parser.add_argument("--goal-id", required=True)
     ws_parser.add_argument("--title", required=True)
     ws_parser.add_argument("--kind", choices=VALID_WORKSTREAM_KINDS, required=True)
+    ws_parser.add_argument(
+        "--input", dest="inputs", action="append", default=[],
+        help="Reuse an existing workspace-relative file without copying; repeat for multiple inputs",
+    )
     ws_parser.set_defaults(func=_cmd_new_workstream)
 
     gate_parser = subparsers.add_parser("check-gate", help="Check a harness gate")
@@ -136,6 +140,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     render_parser = subparsers.add_parser("render-final", help="Render final working paper")
     render_parser.add_argument("--workspace", default="workspace")
+    render_parser.add_argument(
+        "--overwrite", action="store_true",
+        help="Replace an existing working_paper.md; existing edits will be lost",
+    )
     render_parser.set_defaults(func=_cmd_render_final)
 
     refresh_skills_parser = subparsers.add_parser(
@@ -315,6 +323,7 @@ def _cmd_new_workstream(args: argparse.Namespace) -> int:
         goal_id=args.goal_id,
         title=args.title,
         kind=args.kind,
+        inputs=args.inputs,
     )
     print(f"Created workstream: {path}")
     return 0
@@ -348,7 +357,7 @@ def _cmd_check_gate(args: argparse.Namespace) -> int:
 
 
 def _cmd_render_final(args: argparse.Namespace) -> int:
-    path = render_final(args.workspace)
+    path = render_final(args.workspace, overwrite=args.overwrite)
     print(f"Rendered final working paper: {path}")
     return 0
 

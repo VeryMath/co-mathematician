@@ -10,7 +10,8 @@ Read and preserve that role card's responsibilities and boundaries before acting
 
 Responsibilities:
 - Implement and run only the experiments requested by the approved workstream.
-- Save scripts, inputs, outputs, tables, and logs under the workstream artifacts directory.
+- Save new scripts, outputs, tables, and logs under the workstream artifacts directory.
+- Read upstream files through inputs.md and keep shared inputs unchanged.
 - Record failed runs and counterexample searches under the workstream failures directory.
 - State numerical tolerances, seeds, and reproducibility limits.
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from html import escape
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from .schemas import VALID_WORKSTREAM_KINDS, utc_timestamp
 
@@ -91,6 +94,7 @@ def new_workstream(
     goal_id: str,
     title: str,
     kind: str,
+    inputs: list[str] | None = None,
 ) -> Path:
     if kind not in VALID_WORKSTREAM_KINDS:
         raise ValueError(f"Unsupported workstream kind: {kind}")
@@ -103,6 +107,7 @@ def new_workstream(
     if str(goal.get("status", "")).lower() != "approved":
         raise ValueError(f"Goal {goal_id} is not approved")
 
+    input_files = _input_files(root, inputs or [])
     workstreams_dir = root / "workstreams"
     workstreams_dir.mkdir(parents=True, exist_ok=True)
     workstream_id = _next_workstream_id(workstreams_dir, goal_id, title)
@@ -126,6 +131,10 @@ def new_workstream(
     (path / "WORKSTREAM.md").write_text(_workstream_md(status), encoding="utf-8")
     (path / "plan.md").write_text("# Plan\n\nPending coordinator plan.\n", encoding="utf-8")
     (path / "notes.md").write_text("# Notes\n\nNo notes yet.\n", encoding="utf-8")
+    if input_files:
+        (path / "inputs.md").write_text(
+            _inputs_md(root, path, input_files), encoding="utf-8"
+        )
 
     workstream_refs = goal.setdefault("workstreams", [])
     if workstream_id not in workstream_refs:
@@ -133,6 +142,49 @@ def new_workstream(
         save_goals(root, goals)
 
     return path
+
+
+def _input_files(workspace: Path, inputs: list[str]) -> list[Path]:
+    root = workspace.resolve(strict=True)
+    files: list[Path] = []
+    for value in inputs:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Input paths must be non-empty workspace-relative paths")
+        relative = Path(value.replace("\\", "/"))
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or ":" in value
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        ):
+            raise ValueError(f"Input path must stay within the workspace: {value!r}")
+        try:
+            source = (root / relative).resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise ValueError(f"Input file cannot be read: {value!r}") from exc
+        if not source.is_relative_to(root) or not source.is_file():
+            raise ValueError(f"Input must be an existing file in the workspace: {value!r}")
+        if source not in files:
+            files.append(source)
+    return files
+
+
+def _inputs_md(workspace: Path, workstream: Path, inputs: list[Path]) -> str:
+    root = workspace.resolve(strict=True)
+    lines = [
+        "# Workstream Inputs",
+        "",
+        "Read these existing files in place and treat them as read-only. Save new",
+        "outputs under this workstream's artifacts/ directory. Changes to a source",
+        "file are visible here; these references are not independent copies.",
+        "",
+    ]
+    for source in inputs:
+        label = escape(source.relative_to(root).as_posix(), quote=False)
+        label = re.sub(r"([\\`*_\[\]])", r"\\\1", label)
+        target = Path(os.path.relpath(source, workstream.resolve())).as_posix()
+        lines.append(f"- [{label}]({quote(target, safe='/')})")
+    return "\n".join(lines) + "\n"
 
 
 def load_goals(workspace: str | Path) -> dict[str, Any]:
@@ -208,6 +260,11 @@ def _workstream_md(status: dict[str, Any]) -> str:
 - goal_id: {status["goal_id"]}
 - kind: {status["kind"]}
 - status: active
+
+## Inputs
+
+See inputs.md for upstream files when present. Read shared inputs in place;
+keep new outputs under this workstream's artifacts/ directory.
 
 This workstream is a durable artifact directory. It is not complete until report.md
 passes independent review and the completion gate.

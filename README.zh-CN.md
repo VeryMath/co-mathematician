@@ -390,6 +390,11 @@ co-math new-workstream \
 
 允许的 workstream kind 是 `proof`、`computation`、`literature` 和 `review`。
 
+需要复用上游文件时，为命令添加 `--input <相对于 workspace 的路径>`，多个文件可
+重复添加。新 workstream 会在 `inputs.md` 记录相对链接，直接读取已有文件。
+共享输入保持不变，新输出放在当前 workstream 的 `artifacts/` 下。示例和已有项目的
+处理方式见[输入文件复用说明](docs/artifact-reuse.md)。
+
 每个 workstream report 应包含：
 
 - 重要 claims 的 provenance
@@ -422,6 +427,9 @@ workspace/final/working_paper.md
 
 这是 working paper，不是聊天总结。它应该保留 provenance、uncertainty、
 failed explorations 和 reviewer status。
+
+已有的 `working_paper.md` 默认会保留。只有明确需要替换时，才运行
+`co-math render-final --workspace workspace --overwrite`。
 
 ## 工作区框架
 

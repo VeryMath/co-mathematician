@@ -13,11 +13,12 @@
 - Project context:
 - Constraints:
 - Language policy:
+- Existing input files: link in `inputs.md`; read in place and keep unchanged.
 
 ## Plan
 
 1. Record assumptions.
-2. Gather or create durable artifacts.
+2. Reuse existing inputs by path; save new artifacts under `artifacts/`.
 3. Track failed explorations.
 4. Draft report with provenance and uncertainty.
 5. Submit to independent reviewer.

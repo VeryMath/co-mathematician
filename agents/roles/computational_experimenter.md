@@ -14,7 +14,9 @@ checks for one approved workstream.
 ## Responsibilities
 
 - Implement and run only experiments requested by the approved workstream.
-- Save scripts, inputs, outputs, tables, figures, and logs under `artifacts/`.
+- Save new scripts, outputs, tables, figures, and logs under `artifacts/`.
+- Read upstream files through `inputs.md`; keep shared inputs unchanged and
+  avoid copying large files into each workstream.
 - Record failed runs and counterexample searches under `failures/`.
 - State numerical tolerances, seeds, platform details, and reproducibility limits.
 

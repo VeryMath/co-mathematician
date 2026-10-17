@@ -125,6 +125,14 @@ def _extract_material(path: Path) -> dict:
             ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
             paragraphs = []
             warnings = set()
+            # Remove deleted revisions before paragraph lookup or equation fallback.
+            for parent in root.iter():
+                for child in list(parent):
+                    if child.tag in {ns + "del", ns + "moveFrom"}:
+                        parent.remove(child)
+                        warnings.add("修订中的删除内容已略过，新增内容已保留，请对照原文件。")
+                    elif child.tag in {ns + "ins", ns + "moveTo"}:
+                        warnings.add("修订中的删除内容已略过，新增内容已保留，请对照原文件。")
             for paragraph in root.iter(ns + "p"):
                 text = read_word_paragraph(paragraph, warnings)
                 if text:

@@ -103,8 +103,18 @@ export class Runs {
     let saving = Promise.resolve();
     const persist = () => {
       const state = { projectId, runId: entry.message.id, ...entry.message };
-      saving = saving.then(() => this.core.call('chat.update', state));
-      return saving;
+      const pending = saving.then(() => this.core.call('chat.update', state));
+      // One failed write must not prevent the final save from being attempted.
+      saving = pending.catch(() => {});
+      return pending;
+    };
+    let publishTimer = null;
+    const publishProgress = () => {
+      if (publishTimer) return;
+      publishTimer = setTimeout(() => {
+        publishTimer = null;
+        this.publish(projectId, entry.message);
+      }, 100);
     };
     let dirty = false;
     let persistenceError = null;
@@ -118,15 +128,16 @@ export class Runs {
       await this.model.generate({ ...context, signal: entry.controller.signal, onText: delta => {
         entry.message.content += delta;
         if (entry.message.content.length > 100000) entry.controller.abort(new Error('回答过长，已停止。'));
-        dirty = true; this.publish(projectId, entry.message);
+        dirty = true; publishProgress();
       } });
+      entry.controller.signal.throwIfAborted();
       if (!entry.message.content.trim()) throw new Error('模型没有返回文字，请检查模型设置。');
       entry.message.status = 'succeeded';
     } catch (error) {
       entry.message.status = entry.controller.signal.aborted && !persistenceError ? 'cancelled' : 'failed';
       entry.message.error = persistenceError ? '保存回答失败，请复制当前文字后检查项目目录。' : entry.controller.signal.aborted ? entry.controller.signal.reason?.message || '已停止生成，已有文字保留。' : error.message;
     } finally {
-      clearInterval(interval); clearTimeout(timeout);
+      clearInterval(interval); clearTimeout(timeout); clearTimeout(publishTimer);
       try { await saving; await persist(); }
       catch { entry.message.status = 'failed'; entry.message.error = '保存回答失败，请复制当前文字。'; }
       this.publish(projectId, entry.message);

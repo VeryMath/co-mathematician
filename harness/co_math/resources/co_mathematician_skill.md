@@ -35,7 +35,9 @@ Keep replies short: current situation, first blocker if any, and one next action
    `workspace/project/GOALS.yaml`.
 5. Start a workstream only after the user explicitly approves its goal.
 6. Save proof attempts, computations, literature notes, failed routes, and
-   uncertainty in the workstream directory.
+   uncertainty in the workstream directory. Reuse upstream files with
+   `co-math new-workstream --input <workspace-relative-path>`; read the links in
+   `inputs.md` and keep shared inputs unchanged instead of copying them.
 7. Ask an independent reviewer to inspect every completed workstream report.
    The report author cannot approve their own report.
 8. Produce `workspace/final/working_paper.md` as the final research output, not

@@ -20,6 +20,8 @@ def _latex(node: Element | None) -> str:
         return ""
     kind = node.tag.removeprefix(M)
     child = lambda name: _latex(node.find(M + name))
+    if node.tag in {W + "ins", W + "moveTo"}:
+        return "".join(_latex(item) for item in node)
     if node.tag.startswith(W) or kind.endswith("Pr"):
         return ""
     if kind == "t":

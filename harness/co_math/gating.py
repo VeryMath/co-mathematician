@@ -104,19 +104,16 @@ def _workstream_issues(workstream: Path) -> list[str]:
     if not report.exists():
         issues.append(f"{label}: report.md is missing.")
 
-    approved_reviewers = [
-        review.get("reviewer", path.stem)
-        for path, review in reviews
-        if review.get("approved") is True
-    ]
     coordinator = status.get("coordinator", "workstream_coordinator")
     independent_approvals = [
-        reviewer for reviewer in approved_reviewers if reviewer != coordinator
+        review["reviewer"]
+        for _, review in reviews
+        if _independent_approval(review, coordinator)
     ]
     if not independent_approvals:
         issues.append(f"{label}: missing independent reviewer approval.")
 
-    resolved_reviews = _resolved_review_names(reviews)
+    resolved_reviews = _resolved_review_names(reviews, coordinator)
     for path, review in reviews:
         if review.get("severity") == "blocking" and not _review_is_resolved(
             path, review, resolved_reviews
@@ -151,8 +148,16 @@ def _load_reviews(workstream: Path) -> list[tuple[Path, dict[str, Any]]]:
     for path in sorted(reviews_dir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            data = {"severity": "blocking", "comment": "Review JSON is invalid."}
+            if (
+                not isinstance(data, dict)
+                or not isinstance(data.get("reviewer"), str)
+                or not data["reviewer"].strip()
+                or not isinstance(data.get("approved"), bool)
+                or data.get("severity") not in ("info", "warning", "blocking")
+            ):
+                raise ValueError("Review fields are invalid")
+        except (OSError, UnicodeError, ValueError):
+            data = {"severity": "blocking", "comment": "Review JSON is unreadable or invalid."}
         reviews.append((path, data))
     return reviews
 
@@ -164,11 +169,26 @@ def _is_workstream_dir(path: Path) -> bool:
     )
 
 
-def _resolved_review_names(reviews: list[tuple[Path, dict[str, Any]]]) -> set[str]:
+def _independent_approval(review: dict[str, Any], coordinator: str) -> bool:
+    reviewer = review.get("reviewer")
+    return (
+        review.get("approved") is True
+        and review.get("severity") in ("info", "warning")
+        and isinstance(reviewer, str)
+        and bool(reviewer.strip())
+        and reviewer.strip() != str(coordinator).strip()
+    )
+
+
+def _resolved_review_names(
+    reviews: list[tuple[Path, dict[str, Any]]], coordinator: str
+) -> set[str]:
     resolved: set[str] = set()
     for path, review in reviews:
         if review.get("resolved") is True:
             resolved.update((path.name, path.stem))
+        if not _independent_approval(review, coordinator):
+            continue
         resolves = review.get("resolves", [])
         if not isinstance(resolves, list):
             continue

@@ -399,6 +399,13 @@ co-math new-workstream \
 
 Allowed workstream kinds are `proof`, `computation`, `literature`, and `review`.
 
+To reuse an upstream file, add `--input <workspace-relative-path>` to the
+command, once per file. The workstream records relative links in `inputs.md`
+and reads the existing files in place. Keep shared inputs unchanged and save
+new outputs under the new workstream's `artifacts/` directory. See
+[reusing workstream inputs](docs/artifact-reuse.md) for examples and existing
+project guidance.
+
 Each workstream should produce a report with:
 
 - provenance for important claims
@@ -431,6 +438,10 @@ workspace/final/working_paper.md
 
 This is a working paper, not a chat summary. It should preserve provenance,
 uncertainty, failed explorations, and reviewer status.
+
+An existing `working_paper.md` is preserved by default. Use
+`co-math render-final --workspace workspace --overwrite` only when you intend
+to replace it with a newly rendered paper.
 
 ## Workspace Framework
 
