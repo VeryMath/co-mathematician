@@ -29,7 +29,7 @@ Co-Mathematician keeps mathematical research in a lasting project. Read, discuss
   <img src="docs/workbench-preview.jpg" alt="White Co-Math workbench with directory search, project continuation, paragraph selection, and a saved model conversation" width="940">
 </p>
 
-The current white interface shows directory search, project continuation, paragraph selection, mathematical notes, and a saved model reply. The screenshot uses the existing public math example and historical conversation. Drag either vertical divider to adjust the layout.
+The white interface with neutral black and gray text shows directory search, project continuation, paragraph selection, mathematical notes, and a saved model reply. The screenshot uses the existing public math example and historical conversation. Drag either vertical divider to adjust the layout.
 
 ## Web Quick Start
 
@@ -151,7 +151,7 @@ Each request can include up to six selected materials. PDF extraction defaults t
 - added project continuation summaries and copyable coding-agent handoffs using existing notes and recent discussion
 - added PDF page and text paragraph selections with accurate preview and transmitted scope
 - added directory browsing, project-wide filename search, and pagination beyond the previous 1,500-file cutoff
-- switched the workbench surfaces to white while retaining green branding and selection markers
+- switched the workbench to white surfaces and neutral text, retaining the original logo colors
 
 <details>
 <summary>0.3.0 and earlier releases</summary>
