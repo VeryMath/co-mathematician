@@ -26,10 +26,10 @@ Co-Mathematician keeps mathematical research in a lasting project. Read, discuss
 ## Inside the Workbench
 
 <p align="center">
-  <img src="docs/workbench-preview.jpg" alt="Co-Math workbench with project materials, mathematical notes, and a real model conversation" width="940">
+  <img src="docs/workbench-preview.jpg" alt="White Co-Math workbench with directory search, project continuation, paragraph selection, and a saved model conversation" width="940">
 </p>
 
-Read formulas, ask about selected materials, and save research notes. This screenshot uses an independent example project and an actual model reply. Drag either vertical divider to adjust the layout.
+The current white interface shows directory search, project continuation, paragraph selection, mathematical notes, and a saved model reply. The screenshot uses the existing public math example and historical conversation. Drag either vertical divider to adjust the layout.
 
 ## Web Quick Start
 
