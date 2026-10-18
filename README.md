@@ -96,21 +96,25 @@ Open settings in the upper-right corner, choose a service, enter your API key, s
 
 1. Create a project with a name and research question. To continue an existing project, click it in the saved list or browse to its folder; the application recognizes it automatically.
 2. Add materials using the file picker or drag files into the workspace. Multiple files are supported; duplicate names are saved separately.
-3. Open a material, add it to the conversation, and ask a question.
+3. Browse material directories or search filenames. Open a file, optionally preview selected PDF pages or text paragraphs, then add it to the conversation.
 4. Save useful replies as research notes. Projects, materials, and saved conversations remain available after refreshing or restarting.
 5. Drag the vertical dividers to resize the panels; double-click to restore defaults. Narrow windows use document and conversation tabs.
+
+When reopening a project, expand the continuation card to see the question,
+recent progress, open questions, and next action. Copy its handoff prompt to
+continue the same project in any coding agent.
 
 ## Current Capabilities and Limits
 
 | Feature | Available in this release |
 | --- | --- |
-| Projects | Create, browse folders, reopen existing research, and read structured research goals |
+| Projects | Create, reopen, read structured goals, and use a continuation summary and coding-agent handoff |
 | Materials | PDF, Word (`.docx`), Markdown, TXT, LaTeX, CSV, JSON/YAML, Python, Lean, and BibTeX; up to 10 MB per file and 10 files per batch |
 | Formulas | Math in Markdown, TXT, LaTeX, research goals, and conversations; common native Word equations; reading/source views |
-| PDF | Original pages, page navigation, and text extraction; bundled character maps and standard fonts |
+| PDF | Original pages, navigation, selected-page extraction, and paragraph ranges for text materials |
 | Conversations | Multiple service profiles, model switching, streamed replies, cancellation, saved history, and notes |
 | VeryMath Skills | Connect a local Skill library, search methods, and use instructions and supported references in a conversation |
-| Interface | VeryMath branding, compact model selection, and resizable panels with remembered widths |
+| Interface | White surfaces, VeryMath branding, directory browsing, filename search, pagination, and resizable panels |
 
 Text formulas need `$…$`, `$$…$$`, `\(...\)`, or `\[…\]` delimiters, for example `The gradient is $\nabla f(x)$`. Ordinary prose is not guessed to be math. LaTeX support is a formula preview, not a full document compiler; use the compiled PDF for complete typesetting. Unsupported formulas keep their source or receive a notice to check the original. **OCR and image-equation recognition are not included.**
 
@@ -138,9 +142,16 @@ The web workbench adds a Git ignore rule for `.co-math/` in both new and existin
 
 Model settings and the opened-project list default to `~/.config/co-math/`; keys are not written there. Research files and conversation history are stored locally. **Sending a question transmits the project overview, selected material text, and recent conversation to your chosen model service**; selected Skill instructions are included as well.
 
-Each request can include up to six selected materials, with leading excerpts used for long files. The PDF reader can display every original page, but text extraction reads at most the first 40 pages. The model receives extracted text, not the full PDF page images. See the [workbench guide](docs/local-web.md) for detailed limits, data locations, and operation.
+Each request can include up to six selected materials. PDF extraction defaults to the first 40 pages; a page selection can start anywhere and include up to 40 pages. Other text supports paragraph ranges separated by blank lines. Character limits still apply, and reply sources distinguish the requested scope from the actual transmitted scope. The model receives extracted text, not PDF page images. See the [workbench guide](docs/local-web.md) for details.
 
 ## Version Updates
+
+### Main branch updates (2026-10-18)
+
+- added project continuation summaries and copyable coding-agent handoffs using existing notes and recent discussion
+- added PDF page and text paragraph selections with accurate preview and transmitted scope
+- added directory browsing, project-wide filename search, and pagination beyond the previous 1,500-file cutoff
+- switched the workbench surfaces to white while retaining green branding and selection markers
 
 <details>
 <summary>0.3.0 and earlier releases</summary>

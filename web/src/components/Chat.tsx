@@ -1,13 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUp, Square, BookmarkPlus, Copy, MessageCircle, X, Check, Settings, ChevronDown, BookOpen } from 'lucide-react';
-import type { Message, ModelSettings, Skill } from '../api';
+import { selectionLabel, type Message, type ModelSettings, type Skill, type MaterialSelection } from '../api';
 import { Markdown } from './Markdown';
 import { skillTitle } from '../skill-labels';
 
 const states: Record<string, string> = { running: '正在思考与生成', succeeded: '回答已保存', failed: '请求失败', cancelled: '已停止', interrupted: '运行中断' };
 
-export function Chat({ messages, settings, files, busy, sending, switchingModel, connected, onSend, onStop, onSave, onRemoveFile, onSettings, onSelectModel, selectedSkill, onSkills, onClearSkill }: {
+export function Chat({ messages, settings, files, ranges = {}, busy, sending, switchingModel, connected, onSend, onStop, onSave, onRemoveFile, onSettings, onSelectModel, selectedSkill, onSkills, onClearSkill }: {
   messages: Message[]; settings: ModelSettings | null; files: string[]; busy: boolean; sending: boolean; connected: boolean;
+  ranges?: Record<string, MaterialSelection>;
   onSend: (content: string) => Promise<void>; onStop: () => void; onSave: (content: string) => void; onRemoveFile: (path: string) => void; onSettings: () => void;
   switchingModel: boolean; onSelectModel: (profileId: string, model?: string) => Promise<void>;
   selectedSkill: Skill | null; onSkills: () => void; onClearSkill: () => void;
@@ -65,9 +66,9 @@ export function Chat({ messages, settings, files, busy, sending, switchingModel,
     </div>
     <div className="composer-area">
       {selectedSkill && <div className="selected-skill"><button onClick={onSkills}><BookOpen size={13}/>{skillTitle(selectedSkill)}</button><button aria-label="取消使用 Skill" onClick={onClearSkill}><X size={12}/></button></div>}
-      {!!files.length && <div className="attachments">{files.map(path => <span key={path} title={path}>{path.split('/').at(-1)}<button aria-label={`移除材料 ${path}`} onClick={() => onRemoveFile(path)}><X size={12}/></button></span>)}</div>}
+      {!!files.length && <div className="attachments">{files.map(path => <span key={path} title={path}>{path.split('/').at(-1)}{ranges[path] ? ` · ${selectionLabel(ranges[path])}` : ''}<button aria-label={`移除材料 ${path}`} onClick={() => onRemoveFile(path)}><X size={12}/></button></span>)}</div>}
       <div className="composer"><textarea aria-label="研究问题" placeholder={settings?.configured ? '提出问题，或继续这段推导…' : '先配置模型，即可围绕项目讨论…'} value={input} maxLength={20000} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}/><div className="composer-footer"><div className="composer-tools"><button onClick={onSkills} aria-label="选择 VeryMath Skill"><BookOpen size={14}/>Skill</button><span>⌘ / Ctrl + Enter</span></div>{busy ? <button className="stop" onClick={onStop}><Square size={12} fill="currentColor"/>停止</button> : <button className="send" aria-label="发送问题" disabled={!input.trim() || sending || !settings?.configured} onClick={() => void submit()}><ArrowUp size={19}/></button>}</div></div>
-      <p className="context-note">发送项目概况、所选材料及最近对话，长材料采用开头节选。<br/>模型回答需要核查，可保存为研究笔记。</p>
+      <p className="context-note">发送项目概况、所选材料范围及最近对话；超出容量时仍会节选。<br/>模型回答需要核查，可保存为研究笔记。</p>
     </div>
   </aside>;
 }

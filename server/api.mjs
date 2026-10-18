@@ -3,6 +3,14 @@ export function json(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
+function materialSelection(url) {
+  const selection = {};
+  for (const key of ['startPage', 'endPage', 'startParagraph', 'endParagraph']) {
+    if (url.searchParams.has(key)) selection[key] = Number(url.searchParams.get(key));
+  }
+  return Object.keys(selection).length ? selection : undefined;
+}
+
 async function body(request, maximumBytes = 800000) {
   if (!request.headers['content-type']?.startsWith('application/json') || request.headers['x-co-math-request'] !== '1') {
     throw Object.assign(new Error('请求格式不正确，请从研究工作台操作。'), { status: 403 });
@@ -72,8 +80,11 @@ export function createApi(core, model, runs) {
       if (method === 'GET' && !action) json(response, 200, await core.call('project.read', params));
       else if (method === 'GET' && action === 'skills') json(response, 200, await core.call('skill.list', params));
       else if (method === 'GET' && action === 'skill') json(response, 200, await core.call('skill.read', { ...params, source: url.searchParams.get('source'), path: url.searchParams.get('path') }));
-      else if (method === 'GET' && action === 'files') json(response, 200, await core.call('file.list', params));
-      else if (method === 'GET' && action === 'file') json(response, 200, await core.call('file.read', { ...params, path: url.searchParams.get('path') }));
+      else if (method === 'GET' && action === 'files') json(response, 200, await core.call('file.list', { ...params,
+        directory: url.searchParams.get('directory'), query: url.searchParams.get('query'),
+        offset: url.searchParams.get('offset'), limit: url.searchParams.get('limit') }));
+      else if (method === 'GET' && action === 'file') json(response, 200, await core.call('file.read', { ...params,
+        path: url.searchParams.get('path'), selection: materialSelection(url) }));
       else if (method === 'POST' && action === 'materials') {
         const input = await body(request, 15_000_000);
         json(response, 201, await core.call('material.import', { ...params, name: input.name, data: input.data }));

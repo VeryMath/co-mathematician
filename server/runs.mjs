@@ -10,6 +10,24 @@ function historyExcerpt(content, allowance) {
   return content.slice(0, headEnd) + marker + content.slice(tailStart);
 }
 
+function sentScope(document, excerpt) {
+  const length = Array.from(excerpt).length;
+  const included = (document.segments || []).filter(part => part.start < length);
+  if (!included.length) return document.selectionLabel || '';
+  const first = included[0]; const last = included.at(-1);
+  const page = first.kind === 'page'; const unit = page ? '页' : '段';
+  let label = `${page ? 'PDF' : '正文'} 第 ${first.number} 至 ${last.number} ${unit}`;
+  if (!last.complete || length < last.end) label += `（第 ${last.number} ${unit}仅发送部分文字）`;
+  return label;
+}
+
+function requestedScope(selection) {
+  if (!selection) return '';
+  return selection.startPage !== undefined
+    ? `PDF 第 ${selection.startPage} 至 ${selection.endPage} 页`
+    : `正文第 ${selection.startParagraph} 至 ${selection.endParagraph} 段`;
+}
+
 export class Runs {
   constructor(core, model) {
     this.core = core; this.model = model;
@@ -35,6 +53,10 @@ export class Runs {
     if (typeof input.content !== 'string' || !input.content.trim() || input.content.length > 20000 || !Array.isArray(input.files) || input.files.length > 6 || input.files.some(f => typeof f !== 'string')) {
       throw Object.assign(new Error('问题不能为空，可附带最多六份材料。'), { status: 400 });
     }
+    const ranges = input.ranges === undefined ? {} : input.ranges;
+    if (!ranges || typeof ranges !== 'object' || Array.isArray(ranges) || Object.entries(ranges).some(([path, range]) => !input.files.includes(path) || !range || typeof range !== 'object' || Array.isArray(range))) {
+      throw Object.assign(new Error('材料范围必须对应本轮选择的文件。'), { status: 400 });
+    }
     const controller = new AbortController();
     const entry = { controller, message: null, completion: null };
     this.active.set(projectId, entry);
@@ -53,14 +75,20 @@ export class Runs {
       const sourceNotes = [];
       let materialBudget = skill ? 14000 : 22000;
       for (const [index, path] of sources.entries()) {
-        const document = await this.core.call('file.read', { projectId, path });
+        const document = await this.core.call('file.read', { projectId, path, ...(ranges[path] ? { selection: ranges[path] } : {}) });
         if (document.readable === false) throw Object.assign(new Error(`${path} 暂时没有可供模型阅读的文字，请先移除该材料或转换为文本。`), { status: 400 });
         const allowance = Math.floor(materialBudget / (sources.length - index));
-        const excerpt = document.content.slice(0, allowance);
+        let excerpt = document.content.slice(0, allowance);
+        if (/[\uD800-\uDBFF]$/.test(excerpt)) excerpt = excerpt.slice(0, -1);
         const shortened = document.content.length > allowance || document.truncated;
+        const scope = sentScope(document, excerpt);
+        const requested = requestedScope(document.selection);
         if (shortened) sourceNotes.push(`${path}：本次仅使用开头节选。`);
-        if (document.note) sourceNotes.push(`${path}：${document.note}`);
-        documents.push({ path, content: excerpt, ...(shortened ? { note: '这是文件开头的节选，不代表完整材料。' } : {}) });
+        if (requested) sourceNotes.push(`${path}：请求范围为${requested}。`);
+        if (scope) sourceNotes.push(`${path}：本轮发送范围为${scope}。`);
+        if (document.note) sourceNotes.push(`${path}：材料预览信息：${document.note}`);
+        documents.push({ path, content: excerpt, ...(scope ? { scope } : {}), ...(requested ? { requestedScope: requested } : {}),
+          ...(shortened ? { note: '这是所读范围开头的节选，不代表完整材料。' } : {}) });
         materialBudget -= excerpt.length;
       }
       const conversation = await this.core.call('chat.read', { projectId });

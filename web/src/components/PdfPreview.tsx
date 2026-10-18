@@ -5,7 +5,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
-export default function PdfPreview({ url }: { url: string }) {
+export default function PdfPreview({ url, initialPage = 1, onPageChange }: { url: string; initialPage?: number; onPageChange?: (page: number) => void }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1); const [pageInput, setPageInput] = useState('1');
   const [width, setWidth] = useState(0); const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ export default function PdfPreview({ url }: { url: string }) {
   const container = useRef<HTMLDivElement>(null); const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    setPdf(null); setPage(1); setPageInput('1'); setError(''); setLoading(true);
+    setPdf(null); setPage(initialPage); setPageInput(String(initialPage)); setError(''); setLoading(true);
     let disposed = false;
     const task = getDocument({ url, useWasm: false, useSystemFonts: true, disableRange: true, disableStream: true,
       cMapUrl: `${window.location.origin}/pdf-assets/cmaps/`, cMapPacked: true,
@@ -56,6 +56,7 @@ export default function PdfPreview({ url }: { url: string }) {
     if (!pdf) return;
     const next = Math.min(pdf.numPages, Math.max(1, Number.isFinite(number) ? Math.trunc(number) : page));
     setPage(next); setPageInput(String(next));
+    onPageChange?.(next);
   }
   return <div className="pdf-preview">
     <div className="pdf-page-controls"><button aria-label="上一页" disabled={!pdf || page <= 1} onClick={() => navigate(page - 1)}><ChevronLeft size={17}/></button>

@@ -192,6 +192,97 @@ class WebService:
             raise ValueError("此文件不在可阅读的研究材料范围内")
         return checked_path(project.root, relative)
 
+    def list_files(self, project, params):
+        query = params.get("query") or ""
+        if not isinstance(query, str) or len(query) > 200:
+            raise ValueError("搜索名称不能超过 200 个字符")
+        query = query.strip().casefold()
+        relative = project.workspace.name if query else (params.get("directory") or f"{project.workspace.name}/project")
+        directory = checked_path(project.root, relative)
+        roots = [project.workspace, project.root / ".agents" / "skills"]
+        if not any(directory == root or directory.is_relative_to(root) for root in roots):
+            raise ValueError("请选择项目材料或项目方法目录")
+        if not directory.is_dir():
+            raise ValueError("材料目录不存在")
+        values = []
+        for key, default in (("offset", 0), ("limit", 100)):
+            value = params.get(key)
+            if value is None:
+                value = default
+            if isinstance(value, bool) or not str(value).isdecimal():
+                raise ValueError("分页参数必须是非负整数")
+            values.append(int(value))
+        offset, limit = values
+        if not 1 <= limit <= 200:
+            raise ValueError("每页可显示 1 至 200 项")
+
+        warnings = []
+
+        def candidates():
+            if not query:
+                with os.scandir(directory) as entries:
+                    items = [entry for entry in entries if not entry.name.startswith(".") and not entry.is_symlink()]
+                items.sort(key=lambda entry: (not entry.is_dir(follow_symlinks=False), entry.name.casefold(), entry.name))
+                for entry in items:
+                    path = Path(entry.path)
+                    if entry.is_dir(follow_symlinks=False):
+                        yield ("directory", path)
+                    elif entry.is_file(follow_symlinks=False) and path.suffix.lower() in MATERIAL_SUFFIXES:
+                        yield ("file", path)
+                return
+            for root in roots:
+                try:
+                    checked_path(project.root, root.relative_to(project.root).as_posix())
+                except ValueError:
+                    continue
+                for current, folders, files in os.walk(root, followlinks=False, onerror=lambda _: warnings.append("部分目录无法读取。")):
+                    folders[:] = [name for name in sorted(folders) if not name.startswith(".") and not (Path(current) / name).is_symlink()]
+                    for name in sorted(files):
+                        path = Path(current) / name
+                        if query in name.casefold() and not name.startswith(".") and not path.is_symlink() and path.suffix.lower() in MATERIAL_SUFFIXES:
+                            yield ("file", path)
+
+        page = []
+        has_more = False
+        for index, item in enumerate(candidates()):
+            if index < offset:
+                continue
+            if len(page) == limit:
+                has_more = True
+                break
+            page.append(item)
+        files, directories = [], []
+        for kind, path in page:
+            relative_path = path.relative_to(project.root).as_posix()
+            if kind == "directory":
+                directories.append({"path": relative_path, "name": path.name})
+                continue
+            try:
+                item = {"path": relative_path, "size": path.stat().st_size}
+                if path.parent == project.workspace / "project":
+                    if path.name in {"GOALS.yaml", "PROJECT.md"}:
+                        item["title"] = "研究目标" if path.name == "GOALS.yaml" else "项目说明"
+                    elif path.name in {"PROJECT_STATUS.md", "SKILL_HANDOFFS.md", "SKILL_REGISTRY.md", "skill_registry.json"}:
+                        item["internal"] = True
+                if relative_path.startswith(".agents/"):
+                    item["internal"] = True
+                if path.suffix.lower() == ".md" and path.parent.name in {"notes", "materials"}:
+                    try:
+                        with path.open(encoding="utf-8") as handle:
+                            heading = handle.readline(300).strip()
+                        if heading.startswith("# "):
+                            item["title"] = heading[2:]
+                    except UnicodeError:
+                        pass
+                files.append(item)
+            except (OSError, UnicodeError):
+                warnings.append(f"无法读取 {path.name}。")
+        parent = directory.parent
+        parent_path = parent.relative_to(project.root).as_posix() if any(parent == root or parent.is_relative_to(root) for root in roots) else None
+        return {"files": files, "directories": directories, "directory": directory.relative_to(project.root).as_posix(),
+                "parent": parent_path, "nextOffset": offset + limit if has_more else None,
+                "hasMore": has_more, "truncated": False, "warnings": list(dict.fromkeys(warnings))[:5]}
+
     def dispatch(self, method, params):
         if not isinstance(params, dict):
             raise ValueError("请求参数必须是对象")
@@ -248,51 +339,18 @@ class WebService:
         if method == "skill.read":
             return self.skills.load(project, params.get("source"), params.get("path"), params.get("directory"))
         if method == "file.list":
-            found = []
-            for start in [project.workspace, project.root / ".agents" / "skills"]:
-                if start.is_symlink() or not start.exists():
-                    continue
-                try:
-                    checked_path(project.root, start.relative_to(project.root).as_posix())
-                except ValueError:
-                    continue
-                for directory, folders, files in os.walk(start, followlinks=False):
-                    folders[:] = [f for f in sorted(folders) if not f.startswith(".") and not (Path(directory) / f).is_symlink()]
-                    for filename in sorted(files):
-                        path = Path(directory) / filename
-                        if path.is_symlink() or path.suffix.lower() not in MATERIAL_SUFFIXES or filename.startswith("."):
-                            continue
-                        item = {"path": path.relative_to(project.root).as_posix(), "size": path.stat().st_size}
-                        if path.parent == project.workspace / "project":
-                            if filename == "GOALS.yaml":
-                                item["title"] = "研究目标"
-                            elif filename == "PROJECT.md":
-                                item["title"] = "项目说明"
-                            elif filename in {"PROJECT_STATUS.md", "SKILL_HANDOFFS.md", "SKILL_REGISTRY.md", "skill_registry.json"}:
-                                item["internal"] = True
-                        if item["path"].startswith(".agents/"):
-                            item["internal"] = True
-                        if path.suffix.lower() == ".md" and path.parent.name in {"notes", "materials"}:
-                            try:
-                                with path.open(encoding="utf-8") as handle:
-                                    heading = handle.readline(300).strip()
-                                if heading.startswith("# "):
-                                    item["title"] = heading[2:]
-                            except UnicodeError:
-                                pass
-                        found.append(item)
-                        if len(found) >= 1500:
-                            return {"files": found, "truncated": True}
-            return {"files": found, "truncated": False}
+            return self.list_files(project, params)
         if method == "file.read":
             relative = text(params.get("path"), "文件路径", 4000)
             path = self.allowed_file(project, relative)
             if path == project.workspace / "project" / "GOALS.yaml":
+                if params.get("selection"):
+                    raise ValueError("研究目标按完整配置展示，请对研究正文选择页码或段落")
                 raw = read_material(path)
                 if raw.get("truncated"):
                     return {"path": relative, "format": "goals", "title": "研究目标", "rawContent": raw["content"], "content": raw["content"], "readable": False, "note": "目标文件过长，无法完整展示。下方只保留原始内容节选，请在外部编辑器查看。"}
                 return {"path": relative, **goals_document(raw["content"])}
-            return {"path": relative, **read_material(path)}
+            return {"path": relative, **read_material(path, selection=params.get("selection"))}
         if method == "material.import":
             directory = checked_path(project.root, f"{project.workspace.name}/project/materials", create_parents=True)
             directory.mkdir(exist_ok=True, mode=0o700)

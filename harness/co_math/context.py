@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,9 @@ def project_summary(project: Project) -> dict[str, object]:
         "question": "Not confirmed yet.",
         "progress": "No goals or workstreams have started.",
         "recent_update": "",
+        "open_question": "",
+        "resume_prompt": "",
+        "latest_note": "",
         "blocker": "",
         "next_action": "Inspect the project files and address the first issue.",
     }
@@ -80,16 +85,16 @@ def project_summary(project: Project) -> dict[str, object]:
             summary["status"] = "archived"
             summary["current"] = "The project is archived."
             summary["next_action"] = "Reopen the project when you want to continue."
+        elif workstreams["blocker"]:
+            summary["status"] = "active"
+            summary["current"] = "Research is waiting on review changes."
+            summary["next_action"] = "Address the blocking review before continuing."
         elif language_status in {"", "pending", "pending_user_choice"} or question_status != "approved":
             summary["status"] = "onboarding"
             summary["current"] = "Project setup is still in progress."
             summary["next_action"] = (
                 "Confirm the research question and choose the document language."
             )
-        elif workstreams["blocker"]:
-            summary["status"] = "active"
-            summary["current"] = "Research is waiting on review changes."
-            summary["next_action"] = "Address the blocking review before continuing."
         elif workstreams["needs_execution"]:
             summary["status"] = "active"
             summary["current"] = "Research is in progress."
@@ -125,6 +130,7 @@ def project_summary(project: Project) -> dict[str, object]:
     except Exception as exc:
         summary["blocker"] = _short(str(exc))
 
+    _add_continuation(project, summary)
     return summary
 
 
@@ -135,9 +141,13 @@ def render_resume(summary: Mapping[str, object]) -> str:
         f"Progress: {summary['progress']}",
     ]
     if summary.get("recent_update"):
-        lines.append(f"Recent: {summary['recent_update']}")
+        lines.append(f"Recent: {_short(str(summary['recent_update']), 300)}")
+    if summary.get("open_question"):
+        lines.append(f"Open question: {summary['open_question']}")
     if summary.get("blocker"):
         lines.append(f"Blocked by: {summary['blocker']}")
+    if summary.get("latest_note"):
+        lines.append(f"Latest note (relative to project): {summary['latest_note']}")
     lines.extend((f"Next: {summary['next_action']}", f"Path: {summary['path']}"))
     return "\n".join(lines)
 
@@ -148,6 +158,195 @@ def render_next(summary: Mapping[str, object]) -> str:
         lines.append(f"Blocked by: {summary['blocker']}")
     lines.append(f"Next: {summary['next_action']}")
     return "\n".join(lines)
+
+
+def _add_continuation(project: Project, summary: dict[str, object]) -> None:
+    sections = _status_sections(project)
+    note_path, note_title = _latest_note(project)
+    web_message = _latest_web_message(project)
+    web_activity = _short(f"最近网页用户消息（待确认）：{web_message}") if web_message else ""
+    summary["latest_note"] = note_path
+    summary["open_question"] = sections.get("open_question", "") or web_activity
+
+    if sections.get("recent_update"):
+        summary["recent_update"] = sections["recent_update"]
+    else:
+        activity = [str(summary["recent_update"])] if summary["recent_update"] else []
+        if note_path:
+            activity.append(_short(f"最近保存的笔记（内容待核对）：{note_title}", 90))
+        if web_activity:
+            activity.append(web_activity)
+        summary["recent_update"] = _short("；".join(activity), 240)
+
+    if summary["status"] == "onboarding" and not summary["blocker"] and (note_path or web_message):
+        summary["next_action"] = "先阅读最近笔记和讨论，再与用户确认研究问题及下一步目标。"
+
+    if (
+        sections.get("next_action")
+        and not summary["blocker"]
+        and summary["status"] not in {"invalid", "archived"}
+    ):
+        summary["next_action"] = sections["next_action"]
+
+    files = [
+        project.root / "AGENTS.md",
+        project.root / "CLAUDE.md",
+        project.root / ".agents" / "skills" / "co-mathematician" / "SKILL.md",
+        *(project.workspace / "project" / name for name in (
+            "PROJECT.md", "GOALS.yaml", "PROJECT_STATUS.md", "SKILL_HANDOFFS.md",
+            "skill_handoffs.jsonl", "messages.jsonl",
+        )),
+    ]
+    if note_path:
+        files.append(project.root / note_path)
+    if web_message:
+        files.append(project.root / ".co-math" / "web" / "conversation.json")
+    existing = []
+    for path in files:
+        safe = _safe_path(project.root, path)
+        try:
+            if safe is not None and safe.is_file():
+                existing.append(safe.relative_to(project.root).as_posix())
+        except OSError:
+            continue
+    unresolved = summary["open_question"] or "尚未记录，请从现有文件确认。"
+    lines = [
+        "请在以下项目中继续已有研究，遵循项目内指引及已选领域 Skill 的流程。",
+        f"项目路径：{project.root}",
+        f"研究问题：{summary['question']}",
+        f"目标与工作流进度：{summary['progress']}",
+        f"最近进展：{summary['recent_update'] or '尚未记录。'}",
+        f"未解决问题：{unresolved}",
+    ]
+    if summary["blocker"]:
+        lines.append(f"当前阻塞：{summary['blocker']}")
+    lines.extend((
+        f"下一步：{summary['next_action']}",
+        "先阅读以下现有文件（路径相对项目），再阅读其中引用的工作流和审阅记录：",
+        *(f"- {path}" for path in existing),
+        "笔记和网页提问仅表示近期活动；请核对原文与证据，不据此认定结论已证明或问题、目标已获批准。",
+    ))
+    summary["resume_prompt"] = "\n".join(lines)
+
+
+def _safe_path(root: Path, path: Path) -> Path | None:
+    try:
+        parts = path.relative_to(root).parts
+        if root.is_symlink() or ".." in parts:
+            return None
+        current = root
+        for part in parts:
+            current = current / part
+            if current.is_symlink():
+                return None
+        return current
+    except (OSError, ValueError):
+        return None
+
+
+def _optional_text(root: Path, path: Path) -> str:
+    try:
+        safe = _safe_path(root, path)
+        if safe is None or not safe.is_file() or safe.stat().st_size > 8_000_000:
+            return ""
+        with safe.open("rb") as handle:
+            data = handle.read(8_000_001)
+        return data.decode("utf-8") if len(data) <= 8_000_000 else ""
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _status_sections(project: Project) -> dict[str, str]:
+    text = _optional_text(project.root, project.workspace / "project" / "PROJECT_STATUS.md")
+    names = {
+        "recent progress": "recent_update", "最近进展": "recent_update",
+        "open questions": "open_question", "未解决问题": "open_question",
+        "next action": "next_action", "下一步": "next_action",
+    }
+    sections: dict[str, list[str]] = {}
+    current = ""
+    level = 0
+    fence = ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("```", "~~~")):
+            marker = stripped[:3]
+            if not fence:
+                fence = marker
+            elif fence == marker:
+                fence = ""
+            continue
+        if fence:
+            continue
+        heading = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", stripped)
+        if heading:
+            name = names.get(heading[2].casefold(), "")
+            if name or len(heading[1]) <= level:
+                current = name
+                level = len(heading[1])
+                if current:
+                    sections.setdefault(current, [])
+        elif current and stripped:
+            sections[current].append(stripped)
+    return {key: _short(" ".join(lines)) for key, lines in sections.items()}
+
+
+def _latest_note(project: Project) -> tuple[str, str]:
+    directory = _safe_path(project.root, project.workspace / "project" / "notes")
+    candidates: list[tuple[int, Path]] = []
+    try:
+        if directory is None or not directory.is_dir():
+            return "", ""
+        for path in directory.iterdir():
+            if path.name.startswith(".") or path.suffix.lower() != ".md":
+                continue
+            safe = _safe_path(project.root, path)
+            try:
+                if safe is not None and safe.is_file():
+                    candidates.append((safe.stat().st_mtime_ns, safe))
+            except OSError:
+                continue
+    except OSError:
+        return "", ""
+    for _, path in sorted(candidates, reverse=True):
+        try:
+            with path.open(encoding="utf-8") as handle:
+                heading = handle.readline(300).strip()
+            title = heading[2:].strip() if heading.startswith("# ") else path.stem
+            return path.relative_to(project.root).as_posix(), _short(title or path.stem)
+        except (OSError, UnicodeError):
+            continue
+    return "", ""
+
+
+def _latest_web_message(project: Project) -> str:
+    text = _optional_text(project.root, project.root / ".co-math" / "web" / "conversation.json")
+    try:
+        data = json.loads(text)
+    except (ValueError, RecursionError):
+        return ""
+    if not isinstance(data, Mapping) or not isinstance(data.get("messages"), list):
+        return ""
+    acknowledgements = {
+        "ok", "okay", "yes", "thanks", "continue", "go on",
+        "好", "好的", "收到", "谢谢", "继续", "继续吧",
+    }
+    for message in reversed(data["messages"]):
+        if not isinstance(message, Mapping) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if not isinstance(content, str) or not content.strip() or len(content) > 20_000:
+            continue
+        try:
+            content.encode("utf-8")
+        except UnicodeError:
+            continue
+        compact = " ".join(content.split())
+        if compact.casefold().strip("。.!！?？,，;；:：") in acknowledgements:
+            continue
+        if any(character.isalnum() for character in compact):
+            return _short(compact)
+    return ""
 
 
 def _workstream_state(workspace: Path, errors: list[str]) -> dict[str, Any]:
