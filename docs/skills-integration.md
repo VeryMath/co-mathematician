@@ -1,22 +1,38 @@
 # 在 Coding Agent 中使用 Skill
 
-Co-Math Skill 指导 coding agent 创建、继续和整理研究项目。领域 Skill 提供具体的数学方法。任务、讨论、命令执行、笔记与材料保存都由你选择的 coding agent 完成；网页只读取保存的项目文件。
+Skill 可以理解为给 coding agent 的使用说明。Co-Math 自带一份，用来帮助 agent 创建、继续和整理研究项目；其他数学领域的 Skill 可以按需添加。
+
+首次使用不必先学这些配置。推荐按 [README 的安装提示](../README.zh-CN.md#quick-start)，让 coding agent 完成安装和项目创建。
 
 ## 开始或继续项目
 
-安装 Core 后，可在终端或 coding agent 中创建项目：
+安装后，在 coding agent 中说：
+
+```text
+请用 Co-Math 为“我的研究题目”新建一个独立项目，文档使用中文。
+告诉我项目文件夹的位置，先不要开始研究。
+```
+
+用 coding agent 打开返回的**研究项目文件夹**，然后说“继续这个 Co-Math 项目”。项目中已包含 `AGENTS.md` 和 `.agents/skills/co-mathematician/SKILL.md`，通常不需要再单独安装 Co-Math Skill。
+
+支持 Agent Skills 的工具可直接发现项目说明；其他能够读取文件和执行命令的 agent，也可以按 `AGENTS.md` 使用。网页只展示保存的文件，无需选择模型或填写 API Key。
+
+<details>
+<summary>对应的命令</summary>
+
+下面这些步骤可以交给 agent 执行。创建项目：
 
 ```bash
 co-math new "Muon Convergence"
 ```
 
-命令会返回新项目路径。用 coding agent 打开该目录，读取 `AGENTS.md` 和 `.agents/skills/co-mathematician/SKILL.md`，再运行：
+在返回的项目目录中继续：
 
 ```bash
 co-math resume --project .
 ```
 
-支持 Agent Skills 的工具可直接发现项目级 Skill；其他能够读取文件并运行命令的 agent，也可以按 `AGENTS.md` 使用同一套说明。`CLAUDE.md` 指向这些共同文件。无需在网页中选择模型、填写 API Key 或启动 Pi 运行时。
+</details>
 
 ## 添加领域方法
 

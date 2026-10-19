@@ -1,12 +1,26 @@
 # 本地项目可视化
 
-Co-Math 网页用于阅读已有项目。创建项目、安排任务、讨论、写笔记、添加材料和开展研究，都在你选择的 coding agent 中通过现有 Co-Math Skill 与 CLI 完成。网页读取保存下来的文件，展示目标、进展、笔记、材料和历史网页对话。
+Co-Math 网页是项目的阅读界面。你在 coding agent 中研究和保存文件，再来这里看论文、公式、笔记和进展。只在 coding agent 中工作也可以，不必一直打开网页。
 
 网页不需要 API Key，不提供模型配置，也不加载 Pi 运行时。
 
-## 启动
+## 让 coding agent 帮你启动
 
-需要 Node.js 22.19 或更新版本，以及 Python 3.10 或更新版本。先用 Python 的 `--version` 确认版本，再安装当前项目及前端依赖：
+还没安装 Co-Math？先按 [README 的推荐安装方式](../README.zh-CN.md#quick-start)，把安装提示发给 coding agent。
+
+已有项目时，在 coding agent 中打开项目文件夹，然后说：
+
+```text
+请帮我启动 Co-Math 阅读网页，告诉我访问地址和应打开的项目文件夹。
+请使用项目说明中记录的工具位置和 Python 环境。
+```
+
+打开 agent 给出的链接即可。默认地址是 [http://127.0.0.1:4175](http://127.0.0.1:4175)，以实际启动时返回的地址为准。
+
+<details>
+<summary>备选：手动启动网页</summary>
+
+在 Co-Math 工具的源码目录中操作，使用安装它的 Python 环境。需要 Python 3.10+ 和 Node.js 22.19+：
 
 ```bash
 python -m pip install -e .
@@ -15,22 +29,29 @@ npm run build
 CO_MATH_PYTHON=python npm start
 ```
 
-这里的 `python` 应是已安装 Core 依赖的 Python 3.10+ 命令或完整路径。Windows PowerShell 先运行 `$env:CO_MATH_PYTHON="python"`，再运行 `npm start`。从克隆到安装的完整步骤见 [README](../README.zh-CN.md#网页版快速开始)。
+这里的 `python` 应是已安装 Co-Math 依赖的 Python 命令或完整路径。Windows PowerShell 先运行 `$env:CO_MATH_PYTHON="python"`，再运行 `npm start`。从下载到安装的完整步骤见 [README](../README.zh-CN.md#quick-start)。
 
-默认地址为 [http://127.0.0.1:4175](http://127.0.0.1:4175)。开发页面时使用 `npm run dev`；修改服务端代码后需要重启服务。源码更新后重新安装依赖并运行 `npm run build`。
+保持启动进程运行。开发页面时使用 `npm run dev`；修改服务端代码后需要重启服务。源码更新后重新安装依赖并运行 `npm run build`。
+
+</details>
 
 ## 打开已有项目
 
-1. 先在 coding agent 中创建或继续项目。已有项目可直接使用；新项目通过 `co-math new "项目名称"` 创建，也可以让 agent 按 Co-Math Skill 完成。
-2. 在网页中选择已有项目，或浏览到包含 `co-math.toml` 的项目根目录。选择整个项目目录，而不是其中的 `workspace/` 或某个材料目录。
-3. 从文件树打开研究目标、笔记、材料或报告。普通论文文件夹需要先由 coding agent 整理到 Co-Math 项目中，网页不会把它自动创建为研究项目。
+1. 在 coding agent 中创建或继续项目。新项目可以直接说：“请用 Co-Math 新建一个名为‘我的研究’的独立项目，告诉我文件夹位置。”
+2. 在网页点击“打开项目”，选中 agent 给出的研究项目文件夹。选择整个项目目录，其中应有 `co-math.toml`；不要选工具安装目录或里面的 `workspace/` 子目录。
+3. 从左侧打开研究目标、笔记、材料或报告。只有普通论文文件夹时，先让 agent 新建项目并把论文放进去。
 
-在已安装 Core 的终端中，可用以下命令查找项目：
+<details>
+<summary>用终端查找已有项目</summary>
+
+在安装 Co-Math 的环境中运行：
 
 ```bash
 co-math list
 co-math resume --project /path/to/project
 ```
+
+</details>
 
 网页没有新建项目、上传、新建笔记或聊天输入。材料和笔记可由 coding agent 或本地编辑器保存到项目，再回到网页阅读。
 
@@ -42,12 +63,11 @@ co-math resume --project /path/to/project
 `## 未解决问题`、`## 下一步`；英文标题 `Recent Progress`、`Open Questions`、
 `Next Action` 也支持。CLI 的 `co-math resume` 读取同一份项目状态。
 
-在任意能读取项目文件并运行 CLI 的 coding agent 中打开项目目录，可以这样继续：
+下次回来，在 coding agent 中打开原来的项目文件夹，可以直接说：
 
 ```text
-继续这个 Co-Math 项目。请读取 AGENTS.md 和 Co-Mathematician Skill，
-运行 `co-math resume --project .`，根据现有文件继续。
-把新的笔记和进展保存到项目，方便我在网页阅读。
+继续这个 Co-Math 项目，先看看上次的笔记和进展，再和我确认下一步。
+把新的推导、结果和进展保存到项目文件，方便我在网页阅读。
 ```
 
 ## 阅读文件

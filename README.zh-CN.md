@@ -4,15 +4,17 @@
 
 # Co-Mathematician
 
-用任意 coding agent 做数学研究，在网页中阅读保存的项目文件。
+用你熟悉的 coding agent 做数学研究，在网页里查看笔记和结果。
 
-[English](README.md) · [快速开始](#网页版快速开始) · [架构](#architecture) · [完整使用说明](docs/local-web.md)
+[English](README.md) · [快速开始](#quick-start) · [架构](#architecture) · [完整使用说明](docs/local-web.md)
 
 ![version](https://img.shields.io/badge/version-0.3.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
-Co-Mathematician 把数学研究保存为可持续的项目。在 coding agent 中使用 Co-Math Skill 和 CLI 创建项目、讨论问题、写笔记、计算、证明与审查。网页只负责把已保存的项目文件展示出来。
+Co-Mathematician（简称 Co-Math）帮你把一个研究问题保存为独立项目。你在 coding agent 中讨论、计算和修改，笔记与进展留在项目文件夹里。过几天回来，或换一个会话，仍能接着做。
+
+**推荐让 coding agent 帮你安装。** 你不必自己逐条输入终端命令。网页是可选的阅读界面，不需要额外配置模型。
 
 ## 工作台一览
 
@@ -22,13 +24,67 @@ Co-Mathematician 把数学研究保存为可持续的项目。在 coding agent �
 
 页面采用纯白底色和黑灰文字，仅 VeryMath 品牌标志保留原色。预览图展示已有公开数学示例中的研究笔记，截图过程中没有发起模型请求。
 
-## 网页版快速开始
+<a id="quick-start"></a>
+<a id="网页版快速开始"></a>
 
-需要 **Python 3.10+**、**Node.js 22.19+** 和 Git。下面的 `python3` 必须对应满足版本要求的 Python。网页不需要 API Key 或模型配置，也不加载 Pi 运行时；研究所用的 coding agent 按其自身要求设置。
+## 快速开始
 
-### 1. 安装并启动
+准备一个能读写本机文件、执行命令的 coding agent，并确保它已能正常使用。第一次使用按下面三步操作即可。
 
-macOS / Linux 终端：
+### 1. 把这段话发给 coding agent
+
+```text
+请帮我安装 Co-Math：https://github.com/VeryMath/co-mathematician
+先阅读仓库说明，检查所需环境，把工具和研究项目分开放置。
+在桌面的 CoMathProjects 文件夹中新建“我的第一个研究”，研究文档使用中文。
+把工具安装位置和启动方法记入项目说明，方便下次继续使用。
+完成后告诉我研究项目的文件夹位置，现在不要开始研究。
+```
+
+项目名称和保存位置都可以换成你喜欢的。安装完成后，agent 会给出一个**研究项目文件夹**，以后就在这个文件夹中工作。工具只需安装一次，每个研究项目使用独立的文件夹。
+
+### 2. 在 coding agent 中打开这个项目文件夹
+
+在你使用的工具里选择“打开文件夹”或“打开项目”，选中刚才返回的**研究项目文件夹**，不是下载 Co-Math 源码的文件夹。
+
+项目已附带 Co-Math 的使用说明，通常不必再手动安装 Skill。如果 agent 没有识别项目，可以提醒它：“请先读取这个目录的 AGENTS.md。”
+
+### 3. 说出你想研究的问题
+
+例如：
+
+```text
+继续这个 Co-Math 项目。我想研究梯度下降为什么会收敛。
+请先和我澄清问题，再一起确定下一步。
+把有用的推导、计算结果和进展保存到项目文件中。
+```
+
+不必一开始就写出完整的研究计划。你可以像平时一样提问、补充材料和纠正方向。
+
+### 想看论文和笔记？打开阅读网页
+
+网页是可选的。需要时，在 coding agent 中说：
+
+```text
+请帮我启动 Co-Math 阅读网页，告诉我访问地址和应打开的项目文件夹。
+```
+
+打开 agent 给出的地址，点击“打开项目”，选择同一个研究项目。你可以阅读论文、公式、笔记和进展；agent 保存文件后，页面会更新，也可以手动刷新。
+
+研究任务和对话继续在 coding agent 中完成，网页只负责查看。**无需为网页另填 API Key。**
+
+### 下次继续，或者开始新项目
+
+- **继续原项目：** 在 coding agent 中重新打开同一个项目文件夹，说“继续这个 Co-Math 项目，先看看上次做到哪里了”。不必重新安装。
+- **开始新项目：** 说“保留当前项目，为‘新的研究题目’创建另一个 Co-Math 项目，告诉我新文件夹的位置，先不要开始研究”。然后打开新的项目文件夹。
+- **更新工具：** 让 agent 更新 Co-Math 工具本身，并保留已有研究项目。
+
+<details>
+<summary>备选：自己用终端安装</summary>
+
+如果偏好手动操作，可以使用下面的命令。基础安装需要 **Git 和 Python 3.10+**；使用阅读网页还需要 **Node.js 22.19+**。
+
+**macOS / Linux**
 
 ```bash
 git clone https://github.com/VeryMath/co-mathematician.git
@@ -36,69 +92,45 @@ cd co-mathematician
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-npm install --package-lock=false
 co-math setup --projects-home "$HOME/Desktop/CoMathProjects"
+co-math new "我的第一个研究"
+```
+
+用 coding agent 打开命令返回的研究项目目录。若还需要阅读网页，在工具源码目录继续运行：
+
+```bash
+npm install --package-lock=false
 npm run build
 CO_MATH_PYTHON=python npm start
 ```
 
-保持这个终端运行，打开 **[http://127.0.0.1:4175](http://127.0.0.1:4175)**。
-
-上面的设置命令将**之后新建的项目**放在桌面的 `CoMathProjects` 文件夹。可以换成自己喜欢的位置；未设置时程序默认使用 `~/CoMathProjects`。已有项目不会自动搬家。
-
-<details>
-<summary>Windows PowerShell 安装方式</summary>
-
-Windows PowerShell 可使用以下命令安装和启动（尚未完整验证）：
+**Windows PowerShell**（尚未完整验证）
 
 ```powershell
 git clone https://github.com/VeryMath/co-mathematician.git
 cd co-mathematician
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
-npm install --package-lock=false
 .\.venv\Scripts\co-math.exe setup --projects-home "$HOME\Desktop\CoMathProjects"
+.\.venv\Scripts\co-math.exe new "我的第一个研究"
+```
+
+使用阅读网页时，再运行：
+
+```powershell
+npm install --package-lock=false
 npm run build
 $env:CO_MATH_PYTHON = (Resolve-Path .\.venv\Scripts\python.exe).Path
 npm start
 ```
 
+网页默认地址为 [http://127.0.0.1:4175](http://127.0.0.1:4175)，启动它的进程需要保持运行。再次启动时，回到工具源码目录并使用同一个 Python 环境。
+
+上面的命令把新项目放在桌面的 `CoMathProjects` 文件夹。未设置项目位置时，默认使用 `~/CoMathProjects`；已有项目不会自动移动。
+
+手动安装后，也建议让 agent 把工具目录和 Python 环境位置记入研究项目说明，避免换会话后找不到命令。更多启动与阅读说明见[使用文档](docs/local-web.md)。
+
 </details>
-
-<details>
-<summary>再次启动与更新</summary>
-
-后续启动：进入仓库、激活 Python 环境，再运行 `CO_MATH_PYTHON=python npm start`；源码更新后重新安装依赖并执行 `npm run build`。本版为从源码运行的本机服务，还没有一键安装包。
-
-</details>
-
-### 2. 在 coding agent 中创建或继续项目
-
-可以直接使用已有 Co-Math 项目，也可以在另一个已激活 Python 环境的终端创建：
-
-```bash
-co-math new "Muon Convergence"
-```
-
-也可以让 coding agent 按 Co-Math Skill 和 CLI 创建。用它打开命令返回的项目目录，然后说：
-
-```text
-继续这个 Co-Math 项目。请读取 AGENTS.md 和 Co-Mathematician Skill，
-运行 `co-math resume --project .`。把研究笔记、材料和进展保存到项目文件，
-方便我在网页中阅读。
-```
-
-任务、对话、项目创建和研究都在 coding agent 中完成。只要能读取项目说明并运行 CLI，就可以使用同一套项目文件。
-
-### 3. 在网页中打开项目
-
-1. 从列表选择已有项目，或浏览到包含 `co-math.toml` 的项目文件夹。
-2. 浏览文件树或搜索文件名，阅读目标、笔记、材料、PDF 和 LaTeX，也可以下载原文件。
-3. 通过简洁的项目导航阅读说明、目标和进展，需要回到 coding agent 时可查看项目位置。
-4. 项目中如有历史网页对话，可以只读查看；这里不会开始新对话。
-5. 回到 coding agent 继续工作。保存文件后，网页会刷新显示；未及时更新时可手动刷新。
-
-网页没有模型设置、聊天输入、新建笔记、上传或新建项目入口。新增和修改项目文件请使用 coding agent 或本地编辑器。
 
 ## 当前能力与限制
 
@@ -208,16 +240,7 @@ Skill 在 coding agent 中指导研究，由 agent 使用其可用工具执行�
 <details>
 <summary>展开命令行安装、研究流程与平台适配</summary>
 
-以下介绍 coding agent / 命令行研究流程。已完成上方网页快速开始的用户，无需重复安装 Python 命令。
-
-clone Co-Math Core 并安装命令：
-
-```bash
-git clone https://github.com/VeryMath/co-mathematician.git
-cd co-mathematician
-python3 -m pip install -e .
-co-math --help
-```
+以下是 agent 使用的命令和项目结构，供需要了解细节时查阅。首次使用请先看上方[快速开始](#quick-start)，无需重复安装。
 
 指定所有数学项目的父目录。不执行这一步时，默认使用 `~/CoMathProjects`。
 
@@ -263,16 +286,6 @@ co-math reopen --project ~/CoMathProjects/Muon\ Convergence
 
 项目 A 完成后先归档，再运行 `co-math new "Project B"`。项目 B 会得到新的目录、
 workspace、Skill 和 Git 仓库，不会清空或复用项目 A 的研究文件。
-
-### 让 Coding Agent 帮你设置
-
-任何能执行终端命令的 coding agent 都可以完成设置：
-
-```text
-请从 https://github.com/VeryMath/co-mathematician.git 安装 Co-Math，
-把 ~/CoMathProjects 设为项目目录，然后创建名为 Muon Convergence 的项目。
-只返回项目路径，现在不要开始研究。
-```
 
 ### Core 仓库内工作区
 

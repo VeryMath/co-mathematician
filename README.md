@@ -4,15 +4,17 @@
 
 # Co-Mathematician
 
-A local workspace for mathematical research with any coding agent, plus a web page for reading project files.
+Do mathematical research in your coding agent, and read your notes and results in the browser.
 
-[中文说明](README.zh-CN.md) · [Quick Start](#web-quick-start) · [Architecture](#architecture) · [Full Guide](docs/local-web.md)
+[中文说明](README.zh-CN.md) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Full Guide](docs/local-web.md)
 
 ![version](https://img.shields.io/badge/version-0.3.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
-Co-Mathematician keeps mathematical research in a lasting project. Use the Co-Math Skill and CLI in your coding agent to create projects, discuss questions, write notes, compute, prove, and review. The web page only visualizes the saved project files.
+Co-Mathematician (Co-Math) gives each research question its own project. Discuss, compute, and make changes in your coding agent; keep notes and progress in the project folder. Come back later, or start a new chat, and continue from those files.
+
+**The recommended way to install Co-Math is to ask your coding agent.** You do not need to enter each terminal command yourself. The browser is an optional reading view and needs no additional model configuration.
 
 ## Inside the Workbench
 
@@ -22,13 +24,66 @@ Co-Mathematician keeps mathematical research in a lasting project. Use the Co-Ma
 
 The visualizer uses pure white surfaces and neutral black and gray text, with the original VeryMath logo colors. The preview shows a saved note from the existing public math example. No new model request was made for the screenshot.
 
-## Web Quick Start
+<a id="web-quick-start"></a>
 
-Requires **Python 3.10+**, **Node.js 22.19+**, and Git. In the commands below, `python3` must refer to a supported Python version. The visualizer needs no API key or model configuration and does not load the Pi runtime. Configure your chosen coding agent separately for research.
+## Quick Start
 
-### 1. Install and start
+Start with a coding agent that is already working and can read and write local files and run commands. Follow these three steps for your first project.
 
-macOS / Linux terminal:
+### 1. Send this to your coding agent
+
+```text
+Please install Co-Math: https://github.com/VeryMath/co-mathematician
+Read the repository instructions, check the required environment, and keep the tool separate from my research projects.
+Create a project named "My First Research" in CoMathProjects on my desktop, with research documents in English.
+Record the tool location and startup instructions in the project notes so a future session can use them.
+Tell me where the research project folder is when ready. Do not start the research yet.
+```
+
+You can change the project name, location, and document language. The agent will give you a **research project folder** to work in. Install the tool once; keep each research project in its own folder.
+
+### 2. Open that project folder in your coding agent
+
+Use your tool's "Open folder" or "Open project" action and select the **research project folder** returned above, not the folder containing the Co-Math source code.
+
+The project already includes Co-Math instructions, so you usually do not need to install a Skill separately. If the agent does not recognize the project, ask it to read the directory's `AGENTS.md` first.
+
+### 3. Describe your research question
+
+For example:
+
+```text
+Continue this Co-Math project. I want to understand why gradient descent converges.
+Help me clarify the question before we choose the next step.
+Save useful derivations, calculations, and progress in the project files.
+```
+
+You do not need a complete research plan upfront. Ask questions, add materials, and refine the direction as you go.
+
+### Want to read papers and notes? Open the browser view
+
+The browser is optional. When you want it, tell your coding agent:
+
+```text
+Please start the Co-Math reading page and tell me its address and which project folder to open.
+```
+
+Open the returned address, click "Open project," and choose the same research project. Read papers, formulas, notes, and progress there. Saved file changes update the page, with a manual refresh control when needed.
+
+Keep research tasks and conversations in your coding agent; use the browser for reading. **No separate API key is needed for the page.**
+
+### Come back later or start another project
+
+- **Continue a project:** reopen its folder in your coding agent and say, "Continue this Co-Math project. First check where we left off." No reinstall is needed.
+- **Start another project:** say, "Keep this project and create a separate Co-Math project for [new topic]. Tell me its folder location, without starting the research yet." Then open the new folder.
+- **Update the tool:** ask your agent to update Co-Math while preserving your existing research projects.
+
+<details>
+<summary>Alternative: install manually in a terminal</summary>
+
+Use the commands below if you prefer manual setup. The basic installation requires **Git and Python 3.10+**. The optional browser view also requires **Node.js 22.19+**.
+
+**macOS / Linux**
 
 ```bash
 git clone https://github.com/VeryMath/co-mathematician.git
@@ -36,69 +91,45 @@ cd co-mathematician
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-npm install --package-lock=false
 co-math setup --projects-home "$HOME/Desktop/CoMathProjects"
+co-math new "My First Research"
+```
+
+Open the returned research project folder in your coding agent. To add the browser view, continue in the tool's source directory:
+
+```bash
+npm install --package-lock=false
 npm run build
 CO_MATH_PYTHON=python npm start
 ```
 
-Leave the terminal running and open **[http://127.0.0.1:4175](http://127.0.0.1:4175)**.
-
-The setup command places **new projects** in `CoMathProjects` on your desktop. You can choose another directory; without setup, the application defaults to `~/CoMathProjects`. Existing projects are not moved automatically.
-
-<details>
-<summary>Windows PowerShell installation</summary>
-
-For Windows PowerShell, the equivalent commands are below (not fully verified):
+**Windows PowerShell** (not fully verified)
 
 ```powershell
 git clone https://github.com/VeryMath/co-mathematician.git
 cd co-mathematician
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
-npm install --package-lock=false
 .\.venv\Scripts\co-math.exe setup --projects-home "$HOME\Desktop\CoMathProjects"
+.\.venv\Scripts\co-math.exe new "My First Research"
+```
+
+To add the browser view:
+
+```powershell
+npm install --package-lock=false
 npm run build
 $env:CO_MATH_PYTHON = (Resolve-Path .\.venv\Scripts\python.exe).Path
 npm start
 ```
 
+The default address is [http://127.0.0.1:4175](http://127.0.0.1:4175). Keep the process running while you read. For later starts, return to the tool's source directory and use the same Python environment.
+
+These commands put new projects in `CoMathProjects` on your desktop. Without a configured project location, the default is `~/CoMathProjects`; existing projects are not moved automatically.
+
+After manual setup, ask the agent to record the tool directory and Python environment in your project notes so future sessions can find the command. See the [full guide](docs/local-web.md) for startup and reading details.
+
 </details>
-
-<details>
-<summary>Restarting and updating</summary>
-
-For subsequent starts, enter the repository, activate the Python environment, and run `CO_MATH_PYTHON=python npm start`. Reinstall dependencies and run `npm run build` after updating the source. This release runs locally from source; a desktop installer is not included.
-
-</details>
-
-### 2. Create or continue a project in your coding agent
-
-Use an existing Co-Math project, or create one from another terminal with the Python environment activated:
-
-```bash
-co-math new "Muon Convergence"
-```
-
-You can also ask your coding agent to create it using the Co-Math Skill and CLI. Open the returned project directory in that agent and say:
-
-```text
-Continue this Co-Math project. Read AGENTS.md and the Co-Mathematician Skill,
-then run `co-math resume --project .`. Save research notes, materials, and
-progress in the project files so I can read them in the web visualizer.
-```
-
-Tasks, dialogue, project creation, and research all happen in the coding agent. Any agent that can read the project instructions and run the CLI can use the same project.
-
-### 3. Open the project in the browser
-
-1. Choose an existing project from the list, or browse to its folder containing `co-math.toml`.
-2. Browse the file tree or search filenames. Read goals, notes, materials, PDFs, and LaTeX, or download the original file.
-3. Use the compact project navigation to read the overview, goals, and progress. The project location is available when you need to open it in your coding agent.
-4. Read historical web conversations when the project has them. This view does not start a new conversation.
-5. Continue working in your coding agent. Saved file changes refresh the view; use the manual refresh control if an update does not appear.
-
-The page has no model settings, chat input, note creation, uploads, or new-project form. Add and edit project files through your coding agent or local editor.
 
 ## Current Capabilities and Limits
 
@@ -209,16 +240,7 @@ The CLI workflow, role definitions, and platform adapters remain below. The web 
 <details>
 <summary>CLI installation, research workflow, and agent integrations</summary>
 
-The following section covers the coding-agent/CLI research workflow. If you followed the web quick start, the Python command is already installed.
-
-Clone Co-Math Core and install its command:
-
-```bash
-git clone https://github.com/VeryMath/co-mathematician.git
-cd co-mathematician
-python3 -m pip install -e .
-co-math --help
-```
+This section documents the commands and project structure used by the agent. For a first installation, follow the [quick start](#quick-start) above; you do not need to install again.
 
 Choose the parent directory for your projects. If you skip this command,
 Co-Math uses `~/CoMathProjects`.
@@ -268,16 +290,6 @@ co-math reopen --project ~/CoMathProjects/Muon\ Convergence
 When project A is finished, archive it and run `co-math new "Project B"`.
 Project B receives a new directory, workspace, Skill, and Git repository; no
 files from project A are cleared or reused.
-
-### Coding-Agent Setup Prompt
-
-Any coding agent that can run terminal commands can do the setup for you:
-
-```text
-Install Co-Math from https://github.com/VeryMath/co-mathematician.git,
-set ~/CoMathProjects as the projects directory, and create a project named
-Muon Convergence. Return its path but do not start the research yet.
-```
 
 ### Core Repository Workspace
 
