@@ -13,7 +13,6 @@
     "start": "node server/index.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
     "katex": "0.16.22",
     "lucide-react": "0.468.0",
     "pdfjs-dist": "6.3.289",

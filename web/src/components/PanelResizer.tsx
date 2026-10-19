@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 
-export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; controls: string }) {
+export function PanelResizer({ panel, controls }: { panel: 'sidebar'; controls: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointer: number; x: number; width: number } | null>(null);
   const [range, setRange] = useState({ value: 0, min: 0, max: 0 });
   const [dragging, setDragging] = useState(false);
   const property = `--${panel}-width`;
   const storageKey = `co-math.${panel}-width`;
-  const label = panel === 'sidebar' ? '调整目录宽度' : '调整文档与对话宽度';
+  const label = '调整目录宽度';
 
   function geometry() {
     const handle = ref.current;
@@ -15,9 +15,8 @@ export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; c
     const app = handle?.closest<HTMLElement>('.app');
     if (!handle?.parentElement || !pane || !app) return null;
     const available = handle.parentElement.clientWidth;
-    const min = panel === 'sidebar' ? 180 : 280;
-    const reserved = panel === 'sidebar' && window.innerWidth > 960 ? 616 : 328;
-    const max = Math.max(min, Math.min(panel === 'sidebar' ? 420 : 680, available - reserved));
+    const min = 180;
+    const max = Math.max(min, Math.min(420, available - 328));
     return { pane, app, min, max, value: Math.round(pane.getBoundingClientRect().width) };
   }
   function sync() {
@@ -28,7 +27,7 @@ export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; c
     const current = geometry();
     if (!current) return;
     const value = Math.round(Math.max(current.min, Math.min(current.max, width)));
-    // Resize only the layout; long mathematical conversations need not rerender on each move.
+    // Resize the layout without rerendering long documents on every pointer move.
     current.app.style.setProperty(property, `${value}px`);
     sync();
   }
@@ -56,7 +55,7 @@ export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; c
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved !== null && Number.isFinite(Number(saved)) && Number(saved) >= current.min) {
-        current.app.style.setProperty(property, `${Math.min(Number(saved), panel === 'sidebar' ? 420 : 680)}px`);
+        current.app.style.setProperty(property, `${Math.min(Number(saved), 420)}px`);
       }
     } catch { /* Use the default layout when storage is unavailable. */ }
     sync();
@@ -84,7 +83,7 @@ export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; c
     }}
     onPointerMove={event => {
       if (!drag.current || event.pointerId !== drag.current.pointer) return;
-      change(drag.current.width + (event.clientX - drag.current.x) * (panel === 'sidebar' ? 1 : -1));
+      change(drag.current.width + event.clientX - drag.current.x);
     }}
     onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish} onDoubleClick={reset}
     onKeyDown={event => {
@@ -93,7 +92,7 @@ export function PanelResizer({ panel, controls }: { panel: 'sidebar' | 'chat'; c
       if (event.key === 'Enter') { reset(); return; }
       const current = geometry(); if (!current) return;
       const step = event.shiftKey ? 40 : 10;
-      change(event.key === 'Home' ? current.min : event.key === 'End' ? current.max : current.value + (event.key === 'ArrowRight' ? 1 : -1) * (panel === 'sidebar' ? 1 : -1) * step);
+      change(event.key === 'Home' ? current.min : event.key === 'End' ? current.max : current.value + (event.key === 'ArrowRight' ? 1 : -1) * step);
       save();
     }}><span aria-hidden="true"/></div>;
 }

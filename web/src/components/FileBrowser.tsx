@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { ArrowUp, Check, FileText, FolderOpen, Search } from 'lucide-react';
+import { ArrowUp, FileText, FolderOpen, Search } from 'lucide-react';
 import { api, type Project, type ProjectFile, type ProjectFilesPage } from '../api';
 
-export function FileBrowser({ project, revision, activePath, selected, onOpen, onFiles }: {
-  project: Project; revision: number; activePath?: string; selected: string[];
+export function FileBrowser({ project, revision, activePath, onOpen, onFiles }: {
+  project: Project; revision: number; activePath?: string;
   onOpen: (path: string) => void; onFiles: Dispatch<SetStateAction<ProjectFile[]>>;
 }) {
   const workspace = project.workspace.split(/[\\/]/).at(-1)!;
@@ -50,7 +50,7 @@ export function FileBrowser({ project, revision, activePath, selected, onOpen, o
   function navigate(path: string) { setQuery(''); setDirectory(path); }
   function fileButton(file: ProjectFile) {
     return <button title={file.path} className={'file-item ' + (activePath === file.path ? 'active' : '')} key={file.path} onClick={() => onOpen(file.path)}>
-      <FileText size={14}/><span>{file.title || file.path.split('/').at(-1)}{query && <small>{file.path}</small>}</span>{selected.includes(file.path) && <Check size={12}/>}
+      <FileText size={14}/><span>{file.title || file.path.split('/').at(-1)}{query && <small>{file.path}</small>}</span>
     </button>;
   }
   const showAll = !!query.trim() || directory.startsWith('.agents/');

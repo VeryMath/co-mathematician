@@ -1,175 +1,220 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { BookOpen, ChevronRight, FileText, FolderOpen, Plus, Settings, RefreshCw, PanelLeftClose, NotebookPen, X, ArrowUpRight, Check, Upload, Download } from 'lucide-react';
-import { api, mergeMessages, type Document, type Message, type ModelSettings, type Project, type ProjectFile, type ImportedMaterial, type Skill, type MaterialSelection } from './api';
+import { ArrowUpRight, BookOpen, Check, ChevronRight, Copy, Download, FileText, FolderOpen, History, PanelLeftClose, RefreshCw, X } from 'lucide-react';
+import { api, type Document, type MaterialSelection, type Project, type ProjectFile } from './api';
 import { TextDocument } from './components/TextDocument';
-import { ProjectDialog, NoteDialog } from './components/Dialogs';
-import { SettingsDialog } from './components/SettingsDialog';
-import { Chat } from './components/Chat';
-import { MaterialsDialog } from './components/MaterialsDialog';
-import { SkillsDialog } from './components/SkillsDialog';
+import { Modal, ProjectDialog } from './components/Dialogs';
 import { GoalsView } from './components/GoalsView';
 import { PanelResizer } from './components/PanelResizer';
 import { FileBrowser } from './components/FileBrowser';
 import { MaterialRange } from './components/MaterialRange';
-import { ProjectResume } from './components/ProjectResume';
+import { ConversationHistory } from './components/ConversationHistory';
 import verymathLogo from './assets/verymath-logo.png?inline';
 
 const PdfPreview = lazy(() => import('./components/PdfPreview'));
 
+function savedProject() {
+  try { return localStorage.getItem('co-math-project') || ''; } catch { return ''; }
+}
+
 export default function App() {
-  const [projects, setProjects] = useState<Project[]>([]); const [home, setHome] = useState('');
-  const [projectId, setProjectId] = useState(() => localStorage.getItem('co-math-project') || '');
-  const [files, setFiles] = useState<ProjectFile[]>([]); const [selected, setSelected] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState(savedProject);
+  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [fileRevision, setFileRevision] = useState(0);
-  const [ranges, setRanges] = useState<Record<string, MaterialSelection>>({});
-  const [pdfPage, setPdfPage] = useState(1);
-  const [document, setDocument] = useState<Document | null>(null); const [messages, setMessages] = useState<Message[]>([]);
-  const [pdfView, setPdfView] = useState<'original' | 'text'>('original');
+  const [document, setDocument] = useState<Document | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; selection: MaterialSelection | null } | null>(null);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
-  const [settings, setSettings] = useState<ModelSettings | null>(null); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const [dialog, setDialog] = useState<'project' | 'settings' | 'note' | 'materials' | 'skills' | null>(null); const [note, setNote] = useState('');
-  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
-  const [initialMaterials, setInitialMaterials] = useState<File[]>([]);
-  const [draggingMaterials, setDraggingMaterials] = useState(false); const dragDepth = useRef(0);
-  const [sending, setSending] = useState(false); const [connected, setConnected] = useState(false); const [loading, setLoading] = useState(false);
-  const [switchingModel, setSwitchingModel] = useState(false);
-  const [sidebar, setSidebar] = useState(() => window.innerWidth >= 960); const [mobilePane, setMobilePane] = useState('document');
+  const [pdfPage, setPdfPage] = useState(1);
+  const [pdfView, setPdfView] = useState<'original' | 'text'>('original');
+  const [previewRevision, setPreviewRevision] = useState(0);
+  const [view, setView] = useState<'document' | 'history'>('document');
+  const [dialog, setDialog] = useState<'project' | 'location' | null>(null);
+  const [sidebar, setSidebar] = useState(() => window.innerWidth > 640);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const currentProject = useRef(projectId); currentProject.current = projectId;
   const documentRequest = useRef(0);
-  const project = projects.find(p => p.id === projectId);
+  const navigationRequest = useRef(0);
+  const pendingChanges = useRef({ running: false, dirty: false, all: false, paths: new Set<string>() });
+  const refresh = useRef<(paths?: string[]) => Promise<void>>(async () => {});
+  const project = projects.find(item => item.id === projectId);
+  const workspace = project?.workspace.split(/[\\/]/).at(-1) || 'workspace';
   const documentTitle = files.find(file => file.path === (openingFile || document?.path))?.title || (!openingFile && document?.title) || (openingFile || document?.path)?.split('/').at(-1) || '项目材料';
-  const busy = messages.some(m => m.status === 'running');
-  async function reloadProjects() {
-    const result = await api<{ projects: Project[]; home: string; errors: { name: string; error: string }[] }>('/projects');
-    setProjects(result.projects); setHome(result.home);
-    if (result.errors.length) setError(result.errors.map(e => `${e.name}：${e.error}`).join('\n'));
-  }
-  async function refreshProject(id: string) {
-    const updated = await api<Project>(`/projects/${id}`);
-    if (currentProject.current === id) setProjects(old => [...old.filter(item => item.id !== id), updated]);
-    return updated;
-  }
-  useEffect(() => { void Promise.all([reloadProjects(), api<ModelSettings>('/settings').then(setSettings)]).catch(e => setError(e.message)); }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void api<{ projects: Project[]; errors: { name: string; error: string }[] }>('/projects', { signal: controller.signal }).then(result => {
+      if (controller.signal.aborted) return;
+      setProjects(result.projects);
+      if (currentProject.current && !result.projects.some(item => item.id === currentProject.current)) setProjectId('');
+      if (result.errors.length) setError(result.errors.map(item => `${item.name}：${item.error}`).join('\n'));
+    }).catch(reason => { if (!controller.signal.aborted) setError(reason.message); });
+    return () => controller.abort();
+  }, []);
+
   useEffect(() => {
     const narrow = window.matchMedia('(max-width:640px)');
     const collapse = () => { if (narrow.matches) setSidebar(false); };
     narrow.addEventListener('change', collapse);
     return () => narrow.removeEventListener('change', collapse);
   }, []);
+
   useEffect(() => {
-    localStorage.setItem('co-math-project', projectId);
-    setFiles([]); setSelected([]); setRanges({}); setPdfPage(1); setMessages([]); setDocument(null); setError(''); setNotice('');
-    setMobilePane('document');
-    setSelectedSkill(null);
-    setOpeningFile(null);
-    setDraggingMaterials(false); dragDepth.current = 0;
-    documentRequest.current++; setConnected(false);
-    const initialDocumentRequest = documentRequest.current;
-    if (!projectId) return;
-    const controller = new AbortController(); const options = { signal: controller.signal };
-    const prefix = `/projects/${projectId}`;
+    try { localStorage.setItem('co-math-project', projectId); } catch { /* Reading works without browser storage. */ }
+    setFiles([]); setDocument(null); setSelectedFile(null); setOpeningFile(null); setError(''); setCopied(false);
+    setView('document'); setPdfPage(1); setWatching(false); setRefreshing(false);
+    const initialRequest = ++documentRequest.current;
+    pendingChanges.current = { running: false, dirty: false, all: false, paths: new Set() };
+    if (!projectId) { setLoading(false); return; }
+    const controller = new AbortController();
     setLoading(true);
-    Promise.all([api<Project>(prefix, options), api<{ messages: Message[] }>(prefix + '/chat', options)]).then(([updated, conversation]) => {
+    void api<Project>(`/projects/${projectId}`, { signal: controller.signal }).then(updated => {
       if (controller.signal.aborted) return;
       setProjects(old => [...old.filter(item => item.id !== updated.id), updated]);
-      setMessages(old => mergeMessages(old, conversation.messages));
-      if (documentRequest.current === initialDocumentRequest) void openFile(`${updated.workspace.split(/[\\/]/).at(-1)}/project/PROJECT.md`, projectId, false, null);
-    }).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    const events = new EventSource('/api' + prefix + '/events');
-    events.onopen = () => {
+      if (documentRequest.current === initialRequest) void openFile(`${updated.workspace.split(/[\\/]/).at(-1)}/project/PROJECT.md`, projectId);
+    }).catch(reason => { if (!controller.signal.aborted) setError(reason.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    const events = new EventSource(`/api/projects/${projectId}/events`);
+    events.onopen = () => { if (!controller.signal.aborted) { setWatching(true); void refresh.current(); } };
+    events.onmessage = event => {
       if (controller.signal.aborted) return;
-      setConnected(true);
-      void api<{ messages: Message[] }>(prefix + '/chat', options).then(data => { if (!controller.signal.aborted) setMessages(old => mergeMessages(old, data.messages)); }).catch(() => {});
+      try {
+        const change = JSON.parse(event.data);
+        if (change.type === 'watch-unavailable') setWatching(false);
+        if (change.type === 'files-changed') void refresh.current(change.paths);
+      } catch { setWatching(false); }
     };
-    events.onmessage = event => { if (!controller.signal.aborted) { const message: Message = JSON.parse(event.data); setMessages(old => mergeMessages(old, [message])); if (message.status && message.status !== 'running') void refreshProject(projectId).catch(() => {}); } };
-    events.onerror = () => { if (!controller.signal.aborted) setConnected(false); };
-    return () => { controller.abort(); events.close(); };
+    events.onerror = () => { if (!controller.signal.aborted) setWatching(false); };
+    const onFocus = () => { if (!controller.signal.aborted) void refresh.current(); };
+    window.addEventListener('focus', onFocus);
+    return () => { controller.abort(); events.close(); window.removeEventListener('focus', onFocus); };
   }, [projectId]);
-  async function openFile(path: string, id = projectId, showDocument = true, selection: MaterialSelection | null = ranges[path] || null) {
+
+  async function openFile(path: string, id = projectId, selection: MaterialSelection | null = null, background = false) {
     const request = ++documentRequest.current;
-    setOpeningFile(path);
+    if (!background) {
+      setOpeningFile(path); setSelectedFile({ path, selection }); setView('document'); setError('');
+      setPdfPage(selection?.startPage || 1); setPdfView(selection ? 'text' : 'original');
+    }
     const query = new URLSearchParams({ path });
     if (selection) for (const [key, value] of Object.entries(selection)) if (value !== undefined) query.set(key, String(value));
-    try { const data = await api<Document>(`/projects/${id}/file?${query}`); if (request === documentRequest.current && currentProject.current === id) {
-      setDocument(data); setPdfPage(data.selection?.startPage || 1); setPdfView(selection ? 'text' : 'original');
-      setRanges(old => { const next = { ...old }; if (data.selection) next[path] = data.selection; else delete next[path]; return next; });
-      if (showDocument) { setMobilePane('document'); if (window.innerWidth <= 640) setSidebar(false); }
-    } }
-    catch (e) { if (request === documentRequest.current) setError((e as Error).message); }
-    finally { if (request === documentRequest.current && currentProject.current === id) setOpeningFile(null); }
-  }
-  async function send(content: string) {
-    setSending(true); setError(''); const id = projectId;
     try {
-      await api(`/projects/${id}/runs`, { method: 'POST', body: { content, files: selected, ranges: Object.fromEntries(selected.filter(path => ranges[path]).map(path => [path, ranges[path]])), profileId: settings?.activeProfileId, model: settings?.model, provider: settings?.provider, baseUrl: settings?.baseUrl, skill: selectedSkill ? { source: selectedSkill.source, path: selectedSkill.path, directory: selectedSkill.directory } : undefined } });
-      const conversation = await api<{ messages: Message[] }>(`/projects/${id}/chat`);
-      if (currentProject.current === id) setMessages(old => mergeMessages(old, conversation.messages));
-    } catch (e) { setError((e as Error).message); void api<ModelSettings>('/settings').then(setSettings).catch(() => {}); throw e; } finally { setSending(false); }
+      const data = await api<Document>(`/projects/${id}/file?${query}`);
+      if (request !== documentRequest.current || currentProject.current !== id) return;
+      setDocument(data); setError('');
+      if (!background) {
+        if (window.innerWidth <= 640) setSidebar(false);
+      }
+      setPreviewRevision(old => old + 1);
+    } catch (reason) {
+      if (request === documentRequest.current && currentProject.current === id) {
+        setDocument(null); setError((reason as Error).message);
+      }
+    } finally {
+      if (request === documentRequest.current && currentProject.current === id) setOpeningFile(null);
+    }
   }
-  async function selectModel(profileId: string, model?: string) {
-    if (switchingModel) return;
-    setSwitchingModel(true); setError('');
-    try {
-      const value = await api<ModelSettings>('/settings/select', { method: 'POST', body: { profileId, model } });
-      setSettings(value);
-    } catch (error) { setError((error as Error).message); }
-    finally { setSwitchingModel(false); }
-  }
-  async function saveNote(title: string, content: string) {
+
+  async function refreshFiles(paths?: string[]) {
     const id = projectId;
-    const saved = await api<Document>(`/projects/${id}/notes`, { method: 'POST', body: { title, content } });
-    if (currentProject.current !== id) return;
-    documentRequest.current++; setOpeningFile(null); setDocument({ ...saved, title }); setDialog(null); setNotice('研究笔记已保存到项目。');
-    setFileRevision(old => old + 1);
-    await refreshProject(id);
-  }
-  async function refreshFiles() {
-    const id = projectId;
+    if (!id) return;
+    const pending = pendingChanges.current;
+    pending.dirty = true;
+    if (!paths?.length) pending.all = true;
+    else for (const path of paths) pending.paths.add(path);
+    if (pending.running) return;
+    pending.running = true; pending.dirty = false;
+    const changes = { all: pending.all, paths: [...pending.paths] };
+    pending.all = false; pending.paths.clear();
+    const reading = documentRequest.current;
+    setRefreshing(true);
     try {
+      const updated = await api<Project>(`/projects/${id}`);
+      if (currentProject.current !== id || pendingChanges.current !== pending) return;
+      setProjects(old => [...old.filter(item => item.id !== id), updated]);
       setFileRevision(old => old + 1);
-      await refreshProject(id);
-      if (currentProject.current !== id) return;
-      if (document) void openFile(document.path, id);
-    } catch (error) { if (currentProject.current === id) setError((error as Error).message); }
+      const changed = changes.all || changes.paths.some(path => selectedFile?.path === path || selectedFile?.path.startsWith(path + '/'));
+      if (view === 'document' && selectedFile && changed && reading === documentRequest.current) await openFile(selectedFile.path, id, selectedFile.selection, true);
+    } catch (reason) {
+      if (currentProject.current === id && pendingChanges.current === pending) setError((reason as Error).message);
+    } finally {
+      pending.running = false;
+      if (currentProject.current === id && pendingChanges.current === pending) {
+        setRefreshing(false);
+        if (pending.dirty) void refresh.current(pending.all ? undefined : [...pending.paths]);
+      }
+    }
   }
-  function addMaterials(incoming: File[] = []) { setInitialMaterials(incoming); setDialog('materials'); }
-  async function materialsAdded(id: string, materials: ImportedMaterial[]) {
-    if (currentProject.current !== id) return;
-    setFileRevision(old => old + 1);
-    if (materials[0]) await openFile(materials[0].path, id, true, null);
+  refresh.current = refreshFiles;
+
+  function openProjectDialog() {
+    navigationRequest.current++;
+    setDialog('project');
   }
-  return <div className={'app ' + (sidebar ? '' : 'sidebar-hidden')}>
+
+  async function selectProject(item: Project) {
+    const request = ++navigationRequest.current;
+    try {
+      const opened = await api<Project>('/projects/open', { method: 'POST', body: { path: item.path } });
+      if (request !== navigationRequest.current) return;
+      setProjects(old => [...old.filter(previous => previous.id !== opened.id), opened]);
+      setProjectId(opened.id);
+    } catch (reason) { if (request === navigationRequest.current) setError((reason as Error).message); }
+  }
+
+  async function copyPath() {
+    try { await navigator.clipboard.writeText(project?.path || ''); setCopied(true); }
+    catch { setError('无法自动复制，可以在项目位置中选中路径复制。'); }
+  }
+
+  function showHistory() {
+    documentRequest.current++; setOpeningFile(null); setView('history'); setError('');
+    if (window.innerWidth <= 640) setSidebar(false);
+  }
+
+  return <div className={'app visualizer ' + (sidebar ? '' : 'sidebar-hidden')}>
     <nav className="sidebar" id="project-sidebar">
-      <a className="brand" href="#" aria-label="VeryMath Co-Math 首页" onClick={e => { e.preventDefault(); setProjectId(''); }}><img className="brand-logo" src={verymathLogo} alt="VeryMath" width={960} height={286}/><span className="brand-caption">Co-Math · 研究工作台</span></a>
-      <button className="new-project" onClick={() => setDialog('project')}><Plus size={17}/>新建 / 打开项目</button>
-      <div className="sidebar-label">我的研究 <span>{projects.length.toString().padStart(2, '0')}</span></div>
-      <div className="project-list">{projects.map(p => <button title={p.path} className={'project-item ' + (p.id === projectId ? 'active' : '')} key={p.id} onClick={() => setProjectId(p.id)}><FolderOpen size={16}/><span>{p.name}</span>{p.id === projectId && <span className="active-pin"/>}</button>)}{!projects.length && <p className="sidebar-hint">每个问题，都有自己的研究空间。</p>}</div>
-      {project && <><div className="sidebar-label materials-label">项目材料<span className="material-list-actions"><button aria-label="添加材料" title="添加材料" onClick={() => addMaterials()}><Plus size={15}/></button><button aria-label="刷新材料" onClick={() => void refreshFiles()}><RefreshCw size={13}/></button></span></div><FileBrowser key={projectId} project={project} revision={fileRevision} activePath={document?.path} selected={selected} onOpen={path => { void openFile(path); }} onFiles={setFiles}/></>}
-      <div className="sidebar-bottom"><span className="local-dot"/><span>本机保存 · 持续研究</span><button aria-label="模型设置" onClick={() => setDialog('settings')}><Settings size={16}/></button></div>
+      <a className="brand" href="#" aria-label="VeryMath Co-Math 首页" onClick={event => { event.preventDefault(); navigationRequest.current++; setProjectId(''); }}>
+        <img className="brand-logo" src={verymathLogo} alt="VeryMath" width={960} height={286}/><span className="brand-caption">Co-Math · 研究阅读器</span>
+      </a>
+      <button className="new-project" onClick={openProjectDialog}><FolderOpen size={16}/>打开项目</button>
+      <div className="sidebar-label">研究项目<span>{projects.length.toString().padStart(2, '0')}</span></div>
+      <div className="project-list">{projects.map(item => <button title={item.path} className={'project-item ' + (item.id === projectId ? 'active' : '')} key={item.id} onClick={() => void selectProject(item)}><FolderOpen size={15}/><span>{item.name}</span>{item.id === projectId && <span className="active-pin"/>}</button>)}{!projects.length && <p className="sidebar-hint">打开 coding agent 中的研究项目。</p>}</div>
+      {project && <><div className="sidebar-label materials-label">项目文件</div><FileBrowser key={projectId} project={project} revision={fileRevision} activePath={view === 'document' ? document?.path : undefined} onOpen={path => { void openFile(path); }} onFiles={setFiles}/></>}
+      <div className="sidebar-bottom"><span className="local-dot"/><span>文件保存在本机 · 网页只读</span></div>
     </nav>
+    {sidebar && <button className="sidebar-dismiss" aria-label="关闭文件侧栏" onClick={() => setSidebar(false)}/>}
     {sidebar && <PanelResizer panel="sidebar" controls="project-sidebar"/>}
-    <main className={'workbench show-' + mobilePane}>
-      <header className="topbar"><div className="breadcrumbs"><button className="icon-button" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}><PanelLeftClose size={18}/></button><span>研究空间</span><ChevronRight size={14}/><strong>{project?.name || '欢迎回来'}</strong></div><div className="topbar-right"><span className="local-badge"><span className="local-dot"/>LOCAL</span><button className="icon-button" onClick={() => setDialog('settings')} aria-label="打开设置"><Settings size={18}/></button></div></header>
+    <main className="workbench">
+      <header className="topbar">
+        <div className="breadcrumbs"><button className="icon-button" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}><PanelLeftClose size={18}/></button><span>研究项目</span><ChevronRight size={14}/><strong>{project?.name || 'Co-Math'}</strong></div>
+        {project && <div className="topbar-right"><span className="sync-status">{watching ? '文件自动更新' : '返回页面时刷新'}</span><button className="icon-button" disabled={refreshing} aria-label="刷新项目" title="刷新项目文件" onClick={() => void refreshFiles()}><RefreshCw size={16} className={refreshing ? 'refreshing' : ''}/></button><button className="icon-button" aria-label="项目位置" title="项目位置" onClick={() => { setCopied(false); setDialog('location'); }}><FolderOpen size={17}/></button></div>}
+      </header>
       {error && <div className="banner error" role="alert"><span>{error}</span><button aria-label="关闭错误" onClick={() => setError('')}><X size={15}/></button></div>}
-      {notice && <div className="banner notice" role="status"><span>{notice}</span><button aria-label="关闭提示" onClick={() => setNotice('')}><X size={15}/></button></div>}
-      {project && <ProjectResume key={projectId} project={project} onOpen={path => { void openFile(path); }}/ >}
-      {!project ? <section className="welcome"><div className="welcome-content"><span className="eyebrow">A PLACE FOR MATHEMATICAL THOUGHT</span><h1>让问题，<br/>一步步变得清楚。</h1><p>把想法、推导与未解决的问题留在同一个地方。<br/>与模型讨论，回到材料，继续你的研究。</p><button className="primary welcome-button" onClick={() => setDialog('project')}><Plus size={18}/>开启研究空间<ArrowUpRight size={18}/></button><div className="welcome-features"><div><BookOpen size={20}/><strong>读懂材料</strong><span>从项目文档出发</span></div><div><NotebookPen size={20}/><strong>留下思考</strong><span>笔记属于你的项目</span></div><div><RefreshCw size={20}/><strong>随时继续</strong><span>重新打开，接着研究</span></div></div></div><div className="math-decoration" aria-hidden="true"><span>∇f(x)</span><i>思考 · 推导 · 再检视</i><div>f(x) − f(x*) ≤ ε</div></div></section> : <><div className="mobile-tabs"><button className={mobilePane === 'document' ? 'active' : ''} onClick={() => setMobilePane('document')}>研究材料</button><button className={mobilePane === 'chat' ? 'active' : ''} onClick={() => setMobilePane('chat')}>模型对话</button></div><div className={'workspace-columns ' + (draggingMaterials ? 'dragging-materials' : '')}
-        onDragEnter={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); dragDepth.current++; setDraggingMaterials(true); } }}
-        onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }}
-        onDragLeave={event => { if (event.dataTransfer.types.includes('Files')) { dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDraggingMaterials(false); } }}
-        onDrop={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); dragDepth.current = 0; setDraggingMaterials(false); addMaterials([...event.dataTransfer.files]); } }}>
-        {draggingMaterials && <div className="workspace-drop-hint"><Upload size={25}/><strong>松开文件，添加到当前项目</strong></div>}<section className="document-pane">
-        <div className="document-toolbar"><div><FileText size={16}/><span>{documentTitle}</span></div><div className="document-tools"><button className="text-button" onClick={() => addMaterials()}><Upload size={14}/>添加材料</button><button className="text-button" onClick={() => { setNote(''); setDialog('note'); }}><Plus size={15}/>写笔记</button></div></div>
-        <div className="document-scroll">{openingFile ? <div className="document-empty" role="status"><BookOpen size={28}/><h3>正在打开材料…</h3></div> : document ? <><div className="document-heading"><span className="eyebrow">{document.format === 'goals' ? 'RESEARCH GOALS' : 'RESEARCH MATERIAL'}</span><button className={'attach-button ' + (selected.includes(document.path) ? 'attached' : '')} disabled={document.readable === false || (!selected.includes(document.path) && selected.length >= 6)} onClick={() => setSelected(old => old.includes(document.path) ? old.filter(p => p !== document.path) : [...old, document.path])}>{selected.includes(document.path) ? <Check size={14}/> : <Plus size={14}/>} {selected.includes(document.path) ? '已加入对话' : '结合此文档提问'}</button></div>
-          {document.format !== 'goals' && (!!document.paragraphCount || !!document.pageCount) && <MaterialRange key={document.path + (document.selectionLabel || '')} document={document} currentPage={pdfPage} onApply={selection => openFile(document.path, projectId, true, selection)}/>}
-          {(document.path.includes('/project/materials/') || /\.(pdf|docx)$/i.test(document.path)) && <div className="material-original-actions">{/\.pdf$/i.test(document.path) && <div className="pdf-view-tabs"><button className={pdfView === 'original' ? 'selected' : ''} onClick={() => setPdfView('original')}>原文</button><button className={pdfView === 'text' ? 'selected' : ''} onClick={() => setPdfView('text')}>提取文字</button></div>}<a href={`/api/projects/${projectId}/download?path=${encodeURIComponent(document.path)}`} download><Download size={14}/>下载原文件</a></div>}{document.note && <p className="material-reading-note">{document.note}</p>}
-          {document.format === 'goals' ? <GoalsView document={document}/> : /\.pdf$/i.test(document.path) && pdfView === 'original' ? <Suspense fallback={<p className="muted">正在打开 PDF…</p>}><PdfPreview url={`/api/projects/${projectId}/preview?path=${encodeURIComponent(document.path)}`} initialPage={pdfPage} onPageChange={setPdfPage}/></Suspense> : <TextDocument key={document.path + (document.selectionLabel || '')} document={document}/>}{document.format !== 'goals' && <footer className="document-end"><span>来自项目文件{document.selectionLabel ? ` · ${document.selectionLabel}` : ''}</span><code>{document.path}</code></footer>}</> : <div className="document-empty"><BookOpen size={28}/><h3>{loading ? '正在读取项目…' : '选择一份材料'}</h3><p>左侧可浏览目录，也可以搜索项目中的文件名。</p></div>}</div>
-      </section><PanelResizer key={`divider-${projectId}`} panel="chat" controls="research-chat"/><Chat key={projectId} selectedSkill={selectedSkill} onSkills={() => setDialog('skills')} onClearSkill={() => setSelectedSkill(null)} messages={messages} settings={settings} files={selected} ranges={ranges} busy={busy} sending={sending || switchingModel} switchingModel={switchingModel} onSelectModel={selectModel} connected={connected} onSend={send} onStop={() => { void api(`/projects/${projectId}/cancel`, { method: 'POST', body: {} }).catch(e => setError(e.message)); }} onSave={content => { setNote(content); setDialog('note'); }} onRemoveFile={path => setSelected(old => old.filter(p => p !== path))} onSettings={() => setDialog('settings')}/></div></>}
+      {!project ? <section className="welcome"><div className="welcome-content"><span className="eyebrow">YOUR RESEARCH, ON THE PAGE</span><h1>把研究，<br/>读得更清楚。</h1><p>在 coding agent 中推进研究，<br/>在这里阅读论文、推导与结果。</p><button className="primary welcome-button" onClick={openProjectDialog}><FolderOpen size={18}/>打开研究项目<ArrowUpRight size={18}/></button><p className="welcome-help">还没有项目？在 coding agent 中说：<br/><q>请用 Co-Math 为我新建一个研究项目。</q></p></div></section> : <>
+        <nav className="project-navigation" aria-label="项目文档">
+          {[['项目说明', 'PROJECT.md'], ['研究目标', 'GOALS.yaml'], ['进展记录', 'PROJECT_STATUS.md']].map(([label, name]) => <button key={name} className={view === 'document' && document?.path === `${workspace}/project/${name}` ? 'active' : ''} onClick={() => void openFile(`${workspace}/project/${name}`)}>{label}</button>)}
+          {project.latest_note && <button className={view === 'document' && document?.path === project.latest_note ? 'active' : ''} onClick={() => void openFile(project.latest_note!)}>最近笔记</button>}
+          <button className={'history-link ' + (view === 'history' ? 'active' : '')} onClick={showHistory}><History size={14}/>历史讨论</button>
+        </nav>
+        {view === 'history' ? <ConversationHistory key={projectId} projectId={projectId}/> : <section className="document-pane">
+          <div className="document-toolbar"><div><FileText size={15}/><span>{documentTitle}</span></div>{document && !openingFile && <a className="download-document" href={`/api/projects/${projectId}/download?path=${encodeURIComponent(document.path)}`} download title="下载原文件"><Download size={14}/><span>原文件</span></a>}</div>
+          <div className="document-scroll"><div className={'reading-page ' + (/\.pdf$/i.test(document?.path || '') ? 'reading-pdf' : '')}>
+            {openingFile ? <div className="document-empty" role="status"><BookOpen size={28}/><h3>正在打开材料…</h3></div> : document ? <>
+              {/\.pdf$/i.test(document.path) && <div className="material-original-actions"><div className="pdf-view-tabs"><button className={pdfView === 'original' ? 'selected' : ''} onClick={() => setPdfView('original')}>原文</button><button className={pdfView === 'text' ? 'selected' : ''} onClick={() => setPdfView('text')}>提取文字</button></div></div>}
+              {document.format !== 'goals' && (!/\.pdf$/i.test(document.path) || pdfView === 'text') && (!!document.paragraphCount || !!document.pageCount) && <MaterialRange key={'range-' + document.path + (document.selectionLabel || '')} document={document} currentPage={pdfPage} onApply={selection => openFile(document.path, projectId, selection)}/>}
+              {document.note && (pdfView === 'text' || !/\.pdf$/i.test(document.path)) && <p className="material-reading-note">{document.note}</p>}
+              {document.format === 'goals' ? <GoalsView document={document}/> : /\.pdf$/i.test(document.path) && pdfView === 'original' ? <Suspense fallback={<p className="muted">正在打开 PDF…</p>}><PdfPreview url={`/api/projects/${projectId}/preview?path=${encodeURIComponent(document.path)}&revision=${previewRevision}`} initialPage={pdfPage} onPageChange={setPdfPage}/></Suspense> : <TextDocument key={'text-' + document.path + (document.selectionLabel || '')} document={document}/>}
+              <footer className="document-end"><span>项目中的原始记录{document.selectionLabel ? ` · ${document.selectionLabel}` : ''}</span><code>{document.path}</code></footer>
+            </> : <div className="document-empty"><BookOpen size={28}/><h3>{loading ? '正在读取项目…' : '选择一份材料'}</h3><p>从左侧打开论文、笔记或研究结果。</p></div>}
+          </div></div>
+        </section>}
+      </>}
     </main>
-    {dialog === 'project' && <ProjectDialog home={home} projects={projects} onClose={() => setDialog(null)} onCreated={p => { setProjects(old => [...old.filter(item => item.id !== p.id), p]); setProjectId(p.id); setDialog(null); }}/ >}
-    {dialog === 'settings' && settings && <SettingsDialog settings={settings} onClose={() => setDialog(null)} onChanged={setSettings}/ >}
-    {dialog === 'note' && project && <NoteDialog initial={note} onClose={() => setDialog(null)} onSave={saveNote}/ >}
-    {dialog === 'materials' && project && <MaterialsDialog key={projectId} projectId={projectId} projectName={project.name} initialFiles={initialMaterials} onClose={() => setDialog(null)} onAdded={materialsAdded}/>}
-    {dialog === 'skills' && project && <SkillsDialog key={projectId} projectId={projectId} onLibraryChanged={() => setSelectedSkill(old => old?.source === 'verymath' ? null : old)} onClose={() => setDialog(null)} onUse={skill => { setSelectedSkill(skill); setDialog(null); setMobilePane('chat'); }}/ >}
+    {dialog === 'project' && <ProjectDialog projects={projects} onClose={() => setDialog(null)} onOpened={item => { navigationRequest.current++; setProjects(old => [...old.filter(previous => previous.id !== item.id), item]); setProjectId(item.id); setDialog(null); }}/ >}
+    {dialog === 'location' && project && <Modal title="项目位置" onClose={() => setDialog(null)}><p className="project-location-help">在 coding agent 中打开这个文件夹，继续同一项研究。</p><div className="project-location-path"><code>{project.path}</code><button aria-label="复制项目路径" onClick={() => void copyPath()}>{copied ? <Check size={16}/> : <Copy size={16}/>}</button></div><p className="form-help">网页展示已保存的文件。研究任务、计算和修改继续在 coding agent 中进行。</p></Modal>}
   </div>;
 }

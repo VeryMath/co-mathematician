@@ -3,18 +3,15 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CoreBridge } from './core-bridge.mjs';
-import { ModelAdapter } from './model.mjs';
-import { Runs } from './runs.mjs';
 import { createApi, json } from './api.mjs';
 
 const core = new CoreBridge();
-const model = new ModelAdapter();
-const runs = new Runs(core, model);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = resolve(root, 'dist');
 const port = Number(process.env.PORT || 4175);
 let vite;
 let server;
+let api;
 let closing = false;
 let ready = false;
 async function close() {
@@ -23,8 +20,8 @@ async function close() {
   ready = false;
   const force = setTimeout(() => process.exit(1), 7000);
   force.unref();
+  api?.close();
   server?.close();
-  await runs.close();
   core.close();
   await vite?.close();
   server?.closeAllConnections();
@@ -35,7 +32,7 @@ try {
     const { createServer: createVite } = await import('vite');
     vite = await createVite({ configFile: resolve(root, 'vite.config.ts'), server: { middlewareMode: true, hmr: false }, appType: 'spa' });
   } else await stat(resolve(dist, 'index.html'));
-  const api = createApi(core, model, runs);
+  api = createApi(core);
   const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.svg': 'image/svg+xml' };
   server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -64,9 +61,9 @@ try {
       else response.end();
     }
   });
+  server.once('close', () => api.close());
   await new Promise((done, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', done); });
   await core.call('startup');
-  await model.init();
   ready = true;
   console.log(`Co-Math: http://127.0.0.1:${server.address().port}`);
   process.on('SIGINT', () => { void close(); });

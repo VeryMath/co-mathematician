@@ -22,7 +22,7 @@ export function MaterialRange({ document, currentPage, onApply }: {
   }
   return <details className="material-range">
     <summary>选择{pdf ? '页码' : '段落'}范围{document.selectionLabel ? ` · ${document.selectionLabel}` : ''}</summary>
-    <p>{pdf ? '按 PDF 实际页序取文字，可选择第 40 页以后的内容。' : '按正文空行划分段落，先预览所选内容，再加入对话。'}{count !== undefined ? ` 共 ${count} ${pdf ? '页' : '段'}。` : ''}</p>
+    <p>{pdf ? '按 PDF 实际页序查看提取文字，每次最多 40 页。' : '按正文空行划分段落，只显示选定范围。'}{count !== undefined ? ` 共 ${count} ${pdf ? '页' : '段'}。` : ''}</p>
     <div className="range-controls"><label>从<input aria-label={pdf ? '起始页' : '起始段落'} type="number" min="1" max={count} value={start} onChange={event => setStart(event.target.value)}/></label>
       <label>至<input aria-label={pdf ? '结束页' : '结束段落'} type="number" min="1" max={count} value={end} onChange={event => setEnd(event.target.value)}/></label>
       <button disabled={busy} onClick={() => void apply()}>预览范围</button>

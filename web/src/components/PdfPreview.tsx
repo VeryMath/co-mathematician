@@ -19,7 +19,12 @@ export default function PdfPreview({ url, initialPage = 1, onPageChange }: { url
       cMapUrl: `${window.location.origin}/pdf-assets/cmaps/`, cMapPacked: true,
       standardFontDataUrl: `${window.location.origin}/pdf-assets/standard_fonts/`,
     });
-    void task.promise.then(document => { if (!disposed) setPdf(document); }).catch(() => { if (!disposed) { setError('暂时无法显示原始页面，可以下载原文件查看。'); setLoading(false); } });
+    void task.promise.then(document => {
+      if (disposed) return;
+      const next = Math.min(document.numPages, Math.max(1, initialPage));
+      setPage(next); setPageInput(String(next)); setPdf(document);
+      if (next !== initialPage) onPageChange?.(next);
+    }).catch(() => { if (!disposed) { setError('暂时无法显示原始页面，可以下载原文件查看。'); setLoading(false); } });
     return () => { disposed = true; void task.destroy().catch(() => {}); };
   }, [url]);
 

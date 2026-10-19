@@ -4,7 +4,7 @@
 
 # Co-Mathematician
 
-A local workspace for mathematical questions, source materials, formulas, and model conversations.
+A local workspace for mathematical research with any coding agent, plus a web page for reading project files.
 
 [中文说明](README.zh-CN.md) · [Quick Start](#web-quick-start) · [Architecture](#architecture) · [Full Guide](docs/local-web.md)
 
@@ -12,28 +12,19 @@ A local workspace for mathematical questions, source materials, formulas, and mo
 
 </div>
 
-Co-Mathematician keeps mathematical research in a lasting project. Read, discuss, and take notes in the browser, then continue computation, proofs, and review with a coding agent.
-
-<a id="architecture"></a>
-
-<p align="center">
-  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
-</p>
-<p align="center">
-  From problem clarification to independent review and research outputs. The web workbench shares the project files; external coding agents drive research execution.
-</p>
+Co-Mathematician keeps mathematical research in a lasting project. Use the Co-Math Skill and CLI in your coding agent to create projects, discuss questions, write notes, compute, prove, and review. The web page only visualizes the saved project files.
 
 ## Inside the Workbench
 
 <p align="center">
-  <img src="docs/workbench-preview.jpg" alt="White Co-Math workbench with directory search, project continuation, paragraph selection, and a saved model conversation" width="940">
+  <img src="docs/workbench-preview.jpg" alt="Co-Math project visualizer with file browsing and a saved mathematical research note" width="940">
 </p>
 
-The white interface with neutral black and gray text shows directory search, project continuation, paragraph selection, mathematical notes, and a saved model reply. The screenshot uses the existing public math example and historical conversation. Drag either vertical divider to adjust the layout.
+The visualizer uses pure white surfaces and neutral black and gray text, with the original VeryMath logo colors. The preview shows a saved note from the existing public math example. No new model request was made for the screenshot.
 
 ## Web Quick Start
 
-Requires **Python 3.10+**, **Node.js 22.19+**, and Git. In the commands below, `python3` must refer to a supported Python version. Actual runs and UI checks have been performed on macOS; Windows and Linux have not been fully verified.
+Requires **Python 3.10+**, **Node.js 22.19+**, and Git. In the commands below, `python3` must refer to a supported Python version. The visualizer needs no API key or model configuration and does not load the Pi runtime. Configure your chosen coding agent separately for research.
 
 ### 1. Install and start
 
@@ -81,70 +72,95 @@ For subsequent starts, enter the repository, activate the Python environment, an
 
 </details>
 
-### 2. Configure a model
+### 2. Create or continue a project in your coding agent
 
-Open settings in the upper-right corner, choose a service, enter your API key, select a model, and save.
+Use an existing Co-Math project, or create one from another terminal with the Python environment activated:
 
-- **ECNU** has its service address prefilled; supply your own key and choose a model.
-- For **other compatible services**, enter the base URL, key, and model ID. You can request the model list or enter it manually.
-- Keep multiple service profiles and switch services or models from the conversation header. A running reply retains the configuration captured when it started.
-- Keys stay in server process memory and must be entered again after a restart. Non-secret settings are saved. `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL_ID` can provide the default profile; see the [workbench guide](docs/local-web.md).
+```bash
+co-math new "Muon Convergence"
+```
 
-**An API key is not needed to create projects or add and read materials.** Actual provider requests have been verified with ECNU `ecnu-max` and `ecnu-plus`; other services have not been individually verified.
+You can also ask your coding agent to create it using the Co-Math Skill and CLI. Open the returned project directory in that agent and say:
 
-### 3. Start researching
+```text
+Continue this Co-Math project. Read AGENTS.md and the Co-Mathematician Skill,
+then run `co-math resume --project .`. Save research notes, materials, and
+progress in the project files so I can read them in the web visualizer.
+```
 
-1. Create a project with a name and research question. To continue an existing project, click it in the saved list or browse to its folder; the application recognizes it automatically.
-2. Add materials using the file picker or drag files into the workspace. Multiple files are supported; duplicate names are saved separately.
-3. Browse material directories or search filenames. Open a file, optionally preview selected PDF pages or text paragraphs, then add it to the conversation.
-4. Save useful replies as research notes. Projects, materials, and saved conversations remain available after refreshing or restarting.
-5. Drag the vertical dividers to resize the panels; double-click to restore defaults. Narrow windows use document and conversation tabs.
+Tasks, dialogue, project creation, and research all happen in the coding agent. Any agent that can read the project instructions and run the CLI can use the same project.
 
-When reopening a project, expand the continuation card to see the question,
-recent progress, open questions, and next action. Copy its handoff prompt to
-continue the same project in any coding agent.
+### 3. Open the project in the browser
+
+1. Choose an existing project from the list, or browse to its folder containing `co-math.toml`.
+2. Browse the file tree or search filenames. Read goals, notes, materials, PDFs, and LaTeX, or download the original file.
+3. Use the compact project navigation to read the overview, goals, and progress. The project location is available when you need to open it in your coding agent.
+4. Read historical web conversations when the project has them. This view does not start a new conversation.
+5. Continue working in your coding agent. Saved file changes refresh the view; use the manual refresh control if an update does not appear.
+
+The page has no model settings, chat input, note creation, uploads, or new-project form. Add and edit project files through your coding agent or local editor.
 
 ## Current Capabilities and Limits
 
 | Feature | Available in this release |
 | --- | --- |
-| Projects | Create, reopen, read structured goals, and use a continuation summary and coding-agent handoff |
-| Materials | PDF, Word (`.docx`), Markdown, TXT, LaTeX, CSV, JSON/YAML, Python, Lean, and BibTeX; up to 10 MB per file and 10 files per batch |
-| Formulas | Math in Markdown, TXT, LaTeX, research goals, and conversations; common native Word equations; reading/source views |
-| PDF | Original pages, navigation, selected-page extraction, and paragraph ranges for text materials |
-| Conversations | Multiple service profiles, model switching, streamed replies, cancellation, saved history, and notes |
-| VeryMath Skills | Connect a local Skill library, search methods, and use instructions and supported references in a conversation |
-| Interface | White surfaces, VeryMath branding, directory browsing, filename search, pagination, and resizable panels |
+| Projects | Open existing projects, read structured goals, and access project details |
+| Files | Directory browsing, project-wide filename search, notes and materials, original-file downloads |
+| Materials | Read PDF, Word (`.docx`), Markdown, TXT, LaTeX, CSV, JSON/YAML, Python, Lean, and BibTeX saved in the project; up to 10 MB per file |
+| Formulas | Math in Markdown, TXT, LaTeX, research goals, and historical conversations; common native Word equations; reading/source views |
+| PDF | Original pages, page navigation, extracted text, and original-file downloads |
+| Conversations | Read-only access to historical web conversations already saved in the project |
+| Skills | Read project-local methods; use the Co-Math and domain Skills in your coding agent |
+| Updates | Refresh after saved file changes, with a manual refresh fallback |
+| Interface | Pure white surfaces, neutral black and gray text, VeryMath branding, and resizable panels |
 
 Text formulas need `$…$`, `$$…$$`, `\(...\)`, or `\[…\]` delimiters, for example `The gradient is $\nabla f(x)$`. Ordinary prose is not guessed to be math. LaTeX support is a formula preview, not a full document compiler; use the compiled PDF for complete typesetting. Unsupported formulas keep their source or receive a notice to check the original. **OCR and image-equation recognition are not included.**
 
-VeryMath Skills currently provide **workflow guidance**: the application reads `SKILL.md` and supported references so the model can follow the method. Selecting a Skill does not install dependencies or execute commands, Lean, solvers, or independent reviewers. See [Skill integration](docs/skills-integration.md) for connection instructions, capacity limits, and interfaces.
+Skills guide work in your coding agent, where commands, computation, and review are carried out using that agent's available tools. The web page can display their saved files. See [Skill integration](docs/skills-integration.md) for the shared project workflow.
 
-The web model has no command execution, arbitrary file-write, or web-search tools. Mathematical replies are drafts requiring review; saving one does not verify a proof. The original CLI research branches, computations, and reviews are driven by an external coding agent. Electron packaging and a web interface for independent review are not implemented.
+The visualizer does not run research or call a model service. Displaying a note, a completed status, or a historical answer does not verify a mathematical claim; independent review remains part of the coding-agent workflow.
 
 ## Where Projects and Data Are Saved
 
-The new-project dialog shows the storage location. A project contains:
+`co-math new` prints the project location. The standard layout is:
 
 ```text
 your-project/
 ├── co-math.toml
+├── AGENTS.md                       # Instructions for your coding agent
+├── CLAUDE.md                       # Pointer to the same instructions
 ├── .agents/skills/                 # Project-local research methods
-├── workspace/project/
-│   ├── PROJECT.md                  # Project overview
-│   ├── GOALS.yaml                  # Research question and goals
-│   ├── materials/                  # Imported original materials
-│   └── notes/                      # Saved research notes
-└── .co-math/web/conversation.json   # Web conversation history
+├── workspace/
+│   ├── project/
+│   │   ├── PROJECT.md              # Project overview
+│   │   ├── GOALS.yaml              # Research question and goals
+│   │   ├── PROJECT_STATUS.md       # Progress, open questions, next action
+│   │   ├── messages.jsonl          # Saved project messages
+│   │   ├── materials/              # Materials added as needed
+│   │   └── notes/                  # Notes saved as needed
+│   ├── workstreams/                # Proofs, computation, reports, reviews
+│   └── final/                      # Working paper and other final files
+└── .co-math/web/conversation.json   # Historical web conversation, if present
 ```
 
-The web workbench adds a Git ignore rule for `.co-math/` in both new and existing projects so ordinary commits exclude conversations. Ignore rules do not affect files that were already explicitly tracked by Git.
+The coding agent creates materials and notes folders as needed. The opened-project list is kept in `web-projects.json` under `~/.config/co-math/` by default. The visualizer reads local project files; it does not require credentials or send them to a model service.
 
-Model settings and the opened-project list default to `~/.config/co-math/`; keys are not written there. Research files and conversation history are stored locally. **Sending a question transmits the project overview, selected material text, and recent conversation to your chosen model service**; selected Skill instructions are included as well.
-
-Each request can include up to six selected materials. PDF extraction defaults to the first 40 pages; a page selection can start anywhere and include up to 40 pages. Other text supports paragraph ranges separated by blank lines. Character limits still apply, and reply sources distinguish the requested scope from the actual transmitted scope. The model receives extracted text, not PDF page images. See the [workbench guide](docs/local-web.md) for details.
+**Private conversations in external coding agents are not automatically synchronized.** Ask the agent to save useful notes, results, and progress in the project. The browser displays those files and any historical web conversation already present; it cannot reconstruct an agent's private chat from file changes. See the [visualizer guide](docs/local-web.md) for data locations and refresh behavior.
 
 ## Version Updates
+
+### Project visualization (2026-10-19)
+
+- research, dialogue, and project creation use the existing Co-Math Skill and CLI in any coding agent
+- the web page opens existing projects and focuses on file browsing, search, goals, notes, materials, PDF/LaTeX reading, and downloads
+- compact project details and read-only historical web conversations remain accessible
+- saved file changes refresh the view, with a manual fallback
+- no web model configuration, new chat, new notes, uploads, or new projects; no Pi runtime or API key is needed
+
+<details>
+<summary>Past features: 2026-10-18, 0.3.0, and earlier</summary>
+
+The entries below describe earlier releases. Their web chat, model configuration, uploads, and creation controls are not part of the current visualizer.
 
 ### Main branch updates (2026-10-18)
 
@@ -153,16 +169,13 @@ Each request can include up to six selected materials. PDF extraction defaults t
 - added directory browsing, project-wide filename search, and pagination beyond the previous 1,500-file cutoff
 - switched the workbench to white surfaces and neutral text, retaining the original logo colors
 
-<details>
-<summary>0.3.0 and earlier releases</summary>
-
 ### 0.3.0 (2026-09-26)
 
 - added the local web workbench with project creation and folder browsing
 - added independent model-service profiles, model switching, streaming, cancellation, and saved conversations
 - added material imports, PDF original-page reading, formula previews, and saved research notes
 - added local VeryMath Skill guidance, readable research goals, and resizable panels
-- retained the existing CLI and project layout; see the capabilities and limits above
+- retained the existing CLI and project layout
 
 ### 0.2.0 (2026-08-29)
 
@@ -178,12 +191,25 @@ Each request can include up to six selected materials. PDF extraction defaults t
 
 </details>
 
+<a id="architecture"></a>
+
+## Research Architecture
+
+<p align="center">
+  <img src="docs/co-mathematician-architecture.png" alt="Co-Mathematician repository architecture" width="940">
+</p>
+<p align="center">
+  From problem clarification to independent review and research outputs. Your coding agent drives the work; the web page reads the saved project files.
+</p>
+
+The CLI workflow, role definitions, and platform adapters remain below. The web page provides a reading view of their saved files.
+
 ## Install And Create Projects
 
 <details>
 <summary>CLI installation, research workflow, and agent integrations</summary>
 
-The following section covers the original coding-agent/CLI workflow. If you followed the web quick start, the Python command is already installed.
+The following section covers the coding-agent/CLI research workflow. If you followed the web quick start, the Python command is already installed.
 
 Clone Co-Math Core and install its command:
 
