@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "co-mathematician-workspace"
-version = "0.3.0"
+version = "0.4.0"
 description = "Lightweight harness for a coding-agent-driven AI Co-Mathematician workspace."
 requires-python = ">=3.10"
 dependencies = [

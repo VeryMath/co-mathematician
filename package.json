@@ -2,7 +2,7 @@
   "name": "co-math-workbench",
   "private": true,
   "type": "module",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "engines": {
     "node": ">=22.19.0"
   },

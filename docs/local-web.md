@@ -57,11 +57,11 @@ co-math resume --project /path/to/project
 
 ## 继续已有研究
 
-通过“项目说明”“研究目标”“进展记录”阅读现有项目文件。“项目位置”提供目录路径，便于在 coding agent 中打开同一项目。显示一条笔记或历史提问不表示目标已完成，也不表示数学结论已证明。
+打开项目后，首页显示“研究概览”。可以查看研究问题、最近进展、未解决问题和下一步，从同一页打开报告、论文提纲、工作论文和最近笔记。报告旁显示核查情况，单条命题的证据和审查意见请查看报告正文。
 
-可在现有 `workspace/project/PROJECT_STATUS.md` 中填写 `## 最近进展`、
-`## 未解决问题`、`## 下一步`；英文标题 `Recent Progress`、`Open Questions`、
-`Next Action` 也支持。CLI 的 `co-math resume` 读取同一份项目状态。
+请让 coding agent 在现有 `workspace/project/PROJECT_STATUS.md` 中更新
+`## 最近进展`、`## 未解决问题` 和 `## 下一步`。也支持英文标题
+`Recent Progress`、`Open Questions`、`Next Action`。`co-math resume` 读取同一份项目状态，并列出可查看的报告。
 
 下次回来，在 coding agent 中打开原来的项目文件夹，可以直接说：
 
@@ -75,6 +75,10 @@ co-math resume --project /path/to/project
 左侧按目录浏览研究文件和项目级 Skills；文件名搜索覆盖可阅读的项目文件，结果可分批加载。搜索按文件名匹配，尚未加入正文全文检索。
 
 “研究目标”将 `GOALS.yaml` 展示为可读的问题、语言和目标列表，也能查看原文。笔记、材料、研究分支报告和最终研究稿都来自项目文件。
+
+报告中的相对链接以报告所在目录为起点。点击链接可以阅读同一项目的证明、脚本、运行结果和审查文件，并用阅读栏的返回按钮回到引用所在文档。PDF 链接可用 `#page=12` 指定原文第 12 页，文字文件可用 `#paragraph=3` 指定正文第 3 段。编号从 1 开始，PDF 页码按文件顺序计数。正文各段按空行划分。
+
+需要整理论文时，可以让 agent 运行 `co-math render-final --workspace workspace --outline`。它会在 `workspace/final/working_paper_outline.md` 保存提纲和通过审查的报告链接。agent 参考提纲撰写 `working_paper.md`，保留原报告、证据和审查记录的链接。
 
 PDF 可显示原始页面、翻页和跳转页码，也能查看提取文字。文件可通过下载入口保存原件。扫描页、部分字体编码、公式或表格的提取文字可能不完整，应对照 PDF 原页；当前没有 OCR 或图片公式识别。
 

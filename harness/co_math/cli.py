@@ -140,9 +140,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     render_parser = subparsers.add_parser("render-final", help="Render final working paper")
     render_parser.add_argument("--workspace", default="workspace")
+    render_parser.add_argument("--outline", action="store_true", help="Create a paper outline with links to reviewed reports")
     render_parser.add_argument(
         "--overwrite", action="store_true",
-        help="Replace an existing working_paper.md; existing edits will be lost",
+        help="Replace the selected output file; existing edits will be lost",
     )
     render_parser.set_defaults(func=_cmd_render_final)
 
@@ -357,8 +358,8 @@ def _cmd_check_gate(args: argparse.Namespace) -> int:
 
 
 def _cmd_render_final(args: argparse.Namespace) -> int:
-    path = render_final(args.workspace, overwrite=args.overwrite)
-    print(f"Rendered final working paper: {path}")
+    path = render_final(args.workspace, overwrite=args.overwrite, outline=args.outline)
+    print(f"Rendered {'working paper outline' if args.outline else 'working paper'}: {path}")
     return 0
 
 

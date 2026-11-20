@@ -1,4 +1,26 @@
-export interface Project { id: string; name: string; path: string; workspace: string; status: string; question: string; blocker: string; recent_update?: string; open_question?: string; next_action?: string; resume_prompt?: string; latest_note?: string; }
+export interface ProjectReport {
+  path: string;
+  title: string;
+  review_status: 'reviewed' | 'pending' | 'blocked';
+  reviews: string[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  workspace: string;
+  status: string;
+  question: string;
+  blocker: string;
+  recent_update?: string;
+  open_question?: string;
+  next_action?: string;
+  latest_note?: string;
+  reports: ProjectReport[];
+  working_paper: string;
+  paper_outline: string;
+}
 export interface ProjectFolders { path: string; name: string; parent: string | null; folders: { name: string; path: string }[]; shortcuts: { name: string; path: string }[]; projectName: string; projectError: string; truncated: boolean; }
 export interface ProjectFile { path: string; size: number; title?: string; internal?: boolean; }
 export interface ProjectFilesPage { files: ProjectFile[]; directories: { path: string; name: string }[]; directory: string; parent: string | null; nextOffset: number | null; hasMore: boolean; warnings?: string[]; }

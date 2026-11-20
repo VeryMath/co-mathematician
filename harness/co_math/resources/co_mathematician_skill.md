@@ -16,6 +16,9 @@ reports their current state.
   conversation.
 - Use `co-math list` to find existing projects.
 - At the start of a project session, run `co-math resume --project .`.
+- Before closing or handing off a session, update the Recent Progress, Open
+  Questions, and Next Action sections in `workspace/project/PROJECT_STATUS.md`.
+  Name the relevant report and the specific step that needs attention.
 - When unsure what to do, run `co-math next --project .` and take only the next
   useful action.
 - Ask the user to confirm before archiving finished work with
@@ -40,8 +43,26 @@ Keep replies short: current situation, first blocker if any, and one next action
    `inputs.md` and keep shared inputs unchanged instead of copying them.
 7. Ask an independent reviewer to inspect every completed workstream report.
    The report author cannot approve their own report.
-8. Produce `workspace/final/working_paper.md` as the final research output, not
-   a chat summary.
+8. Create a linked outline with `co-math render-final --workspace workspace --outline`.
+   Read the linked source reports and write `workspace/final/working_paper.md`.
+   Explain the question and assumptions, order the results by mathematical
+   dependency, and place each limitation near the result it affects.
+   Keep links to the original reports, evidence, and review records.
+
+## Recording Key Claims
+
+Under Claims in each `report.md`, give each key claim its own subsection.
+Write its exact statement and assumptions, identify the evidence type
+(proof, counterexample, numerical observation, literature, or conjecture),
+and link to the supporting material using paths relative to the report.
+Record the claim's review status and link the review once it exists.
+Use `#page=12` for PDF page 12 and `#paragraph=3` for the third paragraph
+of a text document. External sources can use DOI or arXiv links.
+
+When the user requests Lean verification, check the selected claim in the
+project's Lean environment. Save the Lean declaration and verification output.
+Record compilation, unfinished proofs, axioms, and correspondence with the
+original claim separately from the independent review of the mathematical report.
 
 ## Durable Files
 

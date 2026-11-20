@@ -8,7 +8,7 @@ Do mathematical research in your coding agent, and read your notes and results i
 
 [中文说明](README.zh-CN.md) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Full Guide](docs/local-web.md)
 
-![version](https://img.shields.io/badge/version-0.3.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.4.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
@@ -68,7 +68,7 @@ The browser is optional. When you want it, tell your coding agent:
 Please start the Co-Math reading page and tell me its address and which project folder to open.
 ```
 
-Open the returned address, click "Open project," and choose the same research project. Read papers, formulas, notes, and progress there. Saved file changes update the page, with a manual refresh control when needed.
+Open the returned address, click "Open project," and choose the same research project. The overview shows the research question, progress, open questions, and next action. Open a report to follow links to evidence, review records, or a specific PDF page. Saved file changes update the page, with a manual refresh control when needed.
 
 Keep research tasks and conversations in your coding agent; use the browser for reading. **No separate API key is needed for the page.**
 
@@ -179,6 +179,13 @@ The coding agent creates materials and notes folders as needed. The opened-proje
 **Private conversations in external coding agents are not automatically synchronized.** Ask the agent to save useful notes, results, and progress in the project. The browser displays those files and any historical web conversation already present; it cannot reconstruct an agent's private chat from file changes. See the [visualizer guide](docs/local-web.md) for data locations and refresh behavior.
 
 ## Version Updates
+
+### 0.4.0 (2026-11-20)
+
+- Open projects on the research overview and see the question, recent progress, open issues, next action, reports, and review records. `co-math resume` reads the same project state.
+- Record assumptions, evidence, and review status for each key claim in the report. Follow evidence links to project files, specific PDF pages, selected paragraphs, and run logs.
+- Generate `working_paper_outline.md` with `co-math render-final --outline`. It links to reviewed reports for use when writing the paper.
+- Ask your coding agent to install Co-Math, create a project, and continue research. The optional web reader displays saved project files.
 
 ### Project visualization (2026-10-19)
 

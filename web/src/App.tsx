@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, BookOpen, Check, ChevronRight, Copy, Download, FileText, FolderOpen, History, PanelLeftClose, RefreshCw, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BookOpen, Check, ChevronRight, Copy, Download, FileText, FolderOpen, History, PanelLeftClose, RefreshCw, X } from 'lucide-react';
 import { api, type Document, type MaterialSelection, type Project, type ProjectFile } from './api';
 import { TextDocument } from './components/TextDocument';
 import { Modal, ProjectDialog } from './components/Dialogs';
@@ -8,6 +8,8 @@ import { PanelResizer } from './components/PanelResizer';
 import { FileBrowser } from './components/FileBrowser';
 import { MaterialRange } from './components/MaterialRange';
 import { ConversationHistory } from './components/ConversationHistory';
+import { ProjectOverview } from './components/ProjectOverview';
+import { projectLink } from './projectLinks';
 import verymathLogo from './assets/verymath-logo.png?inline';
 
 const PdfPreview = lazy(() => import('./components/PdfPreview'));
@@ -23,11 +25,12 @@ export default function App() {
   const [fileRevision, setFileRevision] = useState(0);
   const [document, setDocument] = useState<Document | null>(null);
   const [selectedFile, setSelectedFile] = useState<{ path: string; selection: MaterialSelection | null } | null>(null);
+  const [returnFile, setReturnFile] = useState<{ path: string; selection: MaterialSelection | null; page: number } | null>(null);
   const [openingFile, setOpeningFile] = useState<string | null>(null);
   const [pdfPage, setPdfPage] = useState(1);
   const [pdfView, setPdfView] = useState<'original' | 'text'>('original');
   const [previewRevision, setPreviewRevision] = useState(0);
-  const [view, setView] = useState<'document' | 'history'>('document');
+  const [view, setView] = useState<'overview' | 'document' | 'history'>('overview');
   const [dialog, setDialog] = useState<'project' | 'location' | null>(null);
   const [sidebar, setSidebar] = useState(() => window.innerWidth > 640);
   const [loading, setLoading] = useState(false);
@@ -65,8 +68,8 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('co-math-project', projectId); } catch { /* Reading works without browser storage. */ }
     setFiles([]); setDocument(null); setSelectedFile(null); setOpeningFile(null); setError(''); setCopied(false);
-    setView('document'); setPdfPage(1); setWatching(false); setRefreshing(false);
-    const initialRequest = ++documentRequest.current;
+    setReturnFile(null); setView('overview'); setPdfPage(1); setWatching(false); setRefreshing(false);
+    documentRequest.current++;
     pendingChanges.current = { running: false, dirty: false, all: false, paths: new Set() };
     if (!projectId) { setLoading(false); return; }
     const controller = new AbortController();
@@ -74,7 +77,6 @@ export default function App() {
     void api<Project>(`/projects/${projectId}`, { signal: controller.signal }).then(updated => {
       if (controller.signal.aborted) return;
       setProjects(old => [...old.filter(item => item.id !== updated.id), updated]);
-      if (documentRequest.current === initialRequest) void openFile(`${updated.workspace.split(/[\\/]/).at(-1)}/project/PROJECT.md`, projectId);
     }).catch(reason => { if (!controller.signal.aborted) setError(reason.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     const events = new EventSource(`/api/projects/${projectId}/events`);
@@ -93,17 +95,21 @@ export default function App() {
     return () => { controller.abort(); events.close(); window.removeEventListener('focus', onFocus); };
   }, [projectId]);
 
-  async function openFile(path: string, id = projectId, selection: MaterialSelection | null = null, background = false) {
+  async function openFile(path: string, id = projectId, selection: MaterialSelection | null = null, background = false, page?: number) {
     const request = ++documentRequest.current;
     if (!background) {
       setOpeningFile(path); setSelectedFile({ path, selection }); setView('document'); setError('');
-      setPdfPage(selection?.startPage || 1); setPdfView(selection ? 'text' : 'original');
+      setReturnFile(null);
+      setPdfPage(page ?? selection?.startPage ?? 1); setPdfView(selection ? 'text' : 'original');
     }
     const query = new URLSearchParams({ path });
     if (selection) for (const [key, value] of Object.entries(selection)) if (value !== undefined) query.set(key, String(value));
     try {
       const data = await api<Document>(`/projects/${id}/file?${query}`);
       if (request !== documentRequest.current || currentProject.current !== id) return;
+      if (page !== undefined && data.pageCount !== undefined && page > data.pageCount) {
+        throw new Error('链接页码超出 PDF 页数。');
+      }
       setDocument(data); setError('');
       if (!background) {
         if (window.innerWidth <= 640) setSidebar(false);
@@ -115,6 +121,17 @@ export default function App() {
       }
     } finally {
       if (request === documentRequest.current && currentProject.current === id) setOpeningFile(null);
+    }
+  }
+
+  function openProjectLink(href: string) {
+    if (!document) return;
+    try {
+      const target = projectLink(document.path, href, workspace);
+      void openFile(target.path, projectId, target.selection, false, target.page);
+      setReturnFile({ path: document.path, selection: document.selection ?? null, page: pdfPage });
+    } catch (reason) {
+      setError((reason as Error).message);
     }
   }
 
@@ -156,6 +173,10 @@ export default function App() {
   }
 
   async function selectProject(item: Project) {
+    if (item.id === projectId) {
+      showOverview();
+      return;
+    }
     const request = ++navigationRequest.current;
     try {
       const opened = await api<Project>('/projects/open', { method: 'POST', body: { path: item.path } });
@@ -172,6 +193,11 @@ export default function App() {
 
   function showHistory() {
     documentRequest.current++; setOpeningFile(null); setView('history'); setError('');
+    if (window.innerWidth <= 640) setSidebar(false);
+  }
+
+  function showOverview() {
+    documentRequest.current++; setOpeningFile(null); setView('overview'); setError('');
     if (window.innerWidth <= 640) setSidebar(false);
   }
 
@@ -196,18 +222,24 @@ export default function App() {
       {error && <div className="banner error" role="alert"><span>{error}</span><button aria-label="关闭错误" onClick={() => setError('')}><X size={15}/></button></div>}
       {!project ? <section className="welcome"><div className="welcome-content"><span className="eyebrow">YOUR RESEARCH, ON THE PAGE</span><h1>把研究，<br/>读得更清楚。</h1><p>在 coding agent 中推进研究，<br/>在这里阅读论文、推导与结果。</p><button className="primary welcome-button" onClick={openProjectDialog}><FolderOpen size={18}/>打开研究项目<ArrowUpRight size={18}/></button><p className="welcome-help">还没有项目？在 coding agent 中说：<br/><q>请用 Co-Math 为我新建一个研究项目。</q></p></div></section> : <>
         <nav className="project-navigation" aria-label="项目文档">
+          <button className={view === 'overview' ? 'active' : ''} aria-current={view === 'overview' ? 'page' : undefined} onClick={showOverview}>研究概览</button>
           {[['项目说明', 'PROJECT.md'], ['研究目标', 'GOALS.yaml'], ['进展记录', 'PROJECT_STATUS.md']].map(([label, name]) => <button key={name} className={view === 'document' && document?.path === `${workspace}/project/${name}` ? 'active' : ''} onClick={() => void openFile(`${workspace}/project/${name}`)}>{label}</button>)}
           {project.latest_note && <button className={view === 'document' && document?.path === project.latest_note ? 'active' : ''} onClick={() => void openFile(project.latest_note!)}>最近笔记</button>}
           <button className={'history-link ' + (view === 'history' ? 'active' : '')} onClick={showHistory}><History size={14}/>历史讨论</button>
         </nav>
-        {view === 'history' ? <ConversationHistory key={projectId} projectId={projectId}/> : <section className="document-pane">
-          <div className="document-toolbar"><div><FileText size={15}/><span>{documentTitle}</span></div>{document && !openingFile && <a className="download-document" href={`/api/projects/${projectId}/download?path=${encodeURIComponent(document.path)}`} download title="下载原文件"><Download size={14}/><span>原文件</span></a>}</div>
+        {view === 'overview' ? <ProjectOverview project={project} workspace={workspace} onOpen={path => void openFile(path)}/> :
+          view === 'history' ? <ConversationHistory key={projectId} projectId={projectId}/> : <section className="document-pane">
+          <div className="document-toolbar"><div>
+            {returnFile && <button type="button" className="project-file-link" aria-label="返回引用所在文档" title="返回引用所在文档"
+              onClick={() => void openFile(returnFile.path, projectId, returnFile.selection, false, returnFile.page)}><ArrowLeft size={15}/></button>}
+            <FileText size={15}/><span>{documentTitle}</span>
+          </div>{document && !openingFile && <a className="download-document" href={`/api/projects/${projectId}/download?path=${encodeURIComponent(document.path)}`} download title="下载原文件"><Download size={14}/><span>原文件</span></a>}</div>
           <div className="document-scroll"><div className={'reading-page ' + (/\.pdf$/i.test(document?.path || '') ? 'reading-pdf' : '')}>
             {openingFile ? <div className="document-empty" role="status"><BookOpen size={28}/><h3>正在打开材料…</h3></div> : document ? <>
               {/\.pdf$/i.test(document.path) && <div className="material-original-actions"><div className="pdf-view-tabs"><button className={pdfView === 'original' ? 'selected' : ''} onClick={() => setPdfView('original')}>原文</button><button className={pdfView === 'text' ? 'selected' : ''} onClick={() => setPdfView('text')}>提取文字</button></div></div>}
               {document.format !== 'goals' && (!/\.pdf$/i.test(document.path) || pdfView === 'text') && (!!document.paragraphCount || !!document.pageCount) && <MaterialRange key={'range-' + document.path + (document.selectionLabel || '')} document={document} currentPage={pdfPage} onApply={selection => openFile(document.path, projectId, selection)}/>}
               {document.note && (pdfView === 'text' || !/\.pdf$/i.test(document.path)) && <p className="material-reading-note">{document.note}</p>}
-              {document.format === 'goals' ? <GoalsView document={document}/> : /\.pdf$/i.test(document.path) && pdfView === 'original' ? <Suspense fallback={<p className="muted">正在打开 PDF…</p>}><PdfPreview url={`/api/projects/${projectId}/preview?path=${encodeURIComponent(document.path)}&revision=${previewRevision}`} initialPage={pdfPage} onPageChange={setPdfPage}/></Suspense> : <TextDocument key={'text-' + document.path + (document.selectionLabel || '')} document={document}/>}
+              {document.format === 'goals' ? <GoalsView document={document}/> : /\.pdf$/i.test(document.path) && pdfView === 'original' ? <Suspense fallback={<p className="muted">正在打开 PDF…</p>}><PdfPreview url={`/api/projects/${projectId}/preview?path=${encodeURIComponent(document.path)}&revision=${previewRevision}`} initialPage={pdfPage} onPageChange={setPdfPage}/></Suspense> : <TextDocument key={'text-' + document.path + (document.selectionLabel || '')} document={document} onProjectLink={openProjectLink}/>}
               <footer className="document-end"><span>项目中的原始记录{document.selectionLabel ? ` · ${document.selectionLabel}` : ''}</span><code>{document.path}</code></footer>
             </> : <div className="document-empty"><BookOpen size={28}/><h3>{loading ? '正在读取项目…' : '选择一份材料'}</h3><p>从左侧打开论文、笔记或研究结果。</p></div>}
           </div></div>

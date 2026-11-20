@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -19,14 +18,17 @@ def project_summary(project: Project) -> dict[str, object]:
         "workspace": str(project.workspace),
         "status": "invalid",
         "current": "The project files need attention.",
-        "question": "Not confirmed yet.",
+        "question": "",
         "progress": "No goals or workstreams have started.",
         "recent_update": "",
         "open_question": "",
         "resume_prompt": "",
         "latest_note": "",
         "blocker": "",
-        "next_action": "Inspect the project files and address the first issue.",
+        "reports": [],
+        "working_paper": "",
+        "paper_outline": "",
+        "next_action": "检查项目文件并处理首个问题。",
     }
     errors: list[str] = []
 
@@ -39,7 +41,7 @@ def project_summary(project: Project) -> dict[str, object]:
         if isinstance(question, Mapping):
             text = str(question.get("text", "")).strip()
             if text:
-                summary["question"] = _short(text)
+                summary["question"] = text
 
         goals = goals_data.get("goals", [])
         if not isinstance(goals, list):
@@ -51,7 +53,14 @@ def project_summary(project: Project) -> dict[str, object]:
         workstreams = _workstream_state(project.workspace, errors)
         recent_update = _recent_update(project.workspace, errors)
         archived = is_project_archived(project)
-        working_paper = (project.workspace / "final" / "working_paper.md").is_file()
+        paper = _safe_path(project.root, project.workspace / "final" / "working_paper.md")
+        working_paper = paper is not None and paper.is_file()
+        if working_paper:
+            summary["working_paper"] = paper.relative_to(project.root).as_posix()
+        outline = _safe_path(project.root, project.workspace / "final" / "working_paper_outline.md")
+        if outline is not None and outline.is_file():
+            summary["paper_outline"] = outline.relative_to(project.root).as_posix()
+        summary["reports"] = workstreams["reports"]
 
         summary["recent_update"] = recent_update
         summary["progress"] = _progress_text(
@@ -80,53 +89,53 @@ def project_summary(project: Project) -> dict[str, object]:
         if errors:
             summary["status"] = "invalid"
             summary["current"] = "The project files need attention."
-            summary["next_action"] = "Address the first reported project-file issue."
+            summary["next_action"] = "处理概览中列出的项目文件问题。"
         elif archived:
             summary["status"] = "archived"
             summary["current"] = "The project is archived."
-            summary["next_action"] = "Reopen the project when you want to continue."
+            summary["next_action"] = "继续研究时，在 coding agent 中重新打开已归档的项目。"
         elif workstreams["blocker"]:
             summary["status"] = "active"
             summary["current"] = "Research is waiting on review changes."
-            summary["next_action"] = "Address the blocking review before continuing."
+            summary["next_action"] = "打开相关报告和审查意见，处理需要修订的内容。"
         elif language_status in {"", "pending", "pending_user_choice"} or question_status != "approved":
             summary["status"] = "onboarding"
             summary["current"] = "Project setup is still in progress."
             summary["next_action"] = (
-                "Confirm the research question and choose the document language."
+                "确认研究问题并选择项目文档的语言。"
             )
         elif workstreams["needs_execution"]:
             summary["status"] = "active"
             summary["current"] = "Research is in progress."
             summary["next_action"] = (
-                f"Continue the active workstream: {workstreams['needs_execution'][0]}."
+                f"继续处理任务「{workstreams['needs_execution'][0]}」。"
             )
         elif workstreams["needs_review"]:
             summary["status"] = "active"
             summary["current"] = "A workstream report is ready for review."
             summary["next_action"] = (
-                f"Ask an independent reviewer to review: {workstreams['needs_review'][0]}."
+                f"请独立审查者检查「{workstreams['needs_review'][0]}」的报告。"
             )
         elif working_paper:
             summary["status"] = "final_ready"
             summary["current"] = "The working paper is ready."
-            summary["next_action"] = "Review the working paper, then archive the project if finished."
+            summary["next_action"] = "阅读工作论文并确认是否可以归档项目。"
         elif workstreams["complete"]:
             summary["status"] = "active"
             summary["current"] = "Reviewed workstreams are ready for synthesis."
-            summary["next_action"] = "Render and revise the final working paper."
+            summary["next_action"] = "根据通过审查的报告整理工作论文。"
         elif approved_goals:
             summary["status"] = "active"
             summary["current"] = "Approved goals are ready for research."
-            summary["next_action"] = "Create a focused workstream for an approved goal."
+            summary["next_action"] = "为已确认的研究目标创建具体任务。"
         elif draft_goals:
             summary["status"] = "active"
             summary["current"] = "Draft goals are waiting for a decision."
-            summary["next_action"] = "Ask the user to approve or revise the draft goals."
+            summary["next_action"] = "请用户确认或修订研究目标。"
         else:
             summary["status"] = "active"
             summary["current"] = "The research question is ready."
-            summary["next_action"] = "Turn the research question into a small set of draft goals."
+            summary["next_action"] = "根据研究问题提出具体目标，请用户确认。"
     except Exception as exc:
         summary["blocker"] = _short(str(exc))
 
@@ -137,7 +146,7 @@ def project_summary(project: Project) -> dict[str, object]:
 def render_resume(summary: Mapping[str, object]) -> str:
     lines = [
         f"Co-Math project: {summary['name']}",
-        f"Question: {summary['question']}",
+        f"Question: {summary['question'] or 'Not recorded yet.'}",
         f"Progress: {summary['progress']}",
     ]
     if summary.get("recent_update"):
@@ -148,6 +157,12 @@ def render_resume(summary: Mapping[str, object]) -> str:
         lines.append(f"Blocked by: {summary['blocker']}")
     if summary.get("latest_note"):
         lines.append(f"Latest note (relative to project): {summary['latest_note']}")
+    for report in summary.get("reports", []):
+        lines.append(f"Report ({report['review_status']}): {report['title']} ({report['path']})")
+    if summary.get("working_paper"):
+        lines.append(f"Working paper (relative to project): {summary['working_paper']}")
+    if summary.get("paper_outline"):
+        lines.append(f"Paper outline (relative to project): {summary['paper_outline']}")
     lines.extend((f"Next: {summary['next_action']}", f"Path: {summary['path']}"))
     return "\n".join(lines)
 
@@ -163,10 +178,8 @@ def render_next(summary: Mapping[str, object]) -> str:
 def _add_continuation(project: Project, summary: dict[str, object]) -> None:
     sections = _status_sections(project)
     note_path, note_title = _latest_note(project)
-    web_message = _latest_web_message(project)
-    web_activity = _short(f"最近网页用户消息（待确认）：{web_message}") if web_message else ""
     summary["latest_note"] = note_path
-    summary["open_question"] = sections.get("open_question", "") or web_activity
+    summary["open_question"] = sections.get("open_question", "")
 
     if sections.get("recent_update"):
         summary["recent_update"] = sections["recent_update"]
@@ -174,12 +187,10 @@ def _add_continuation(project: Project, summary: dict[str, object]) -> None:
         activity = [str(summary["recent_update"])] if summary["recent_update"] else []
         if note_path:
             activity.append(_short(f"最近保存的笔记（内容待核对）：{note_title}", 90))
-        if web_activity:
-            activity.append(web_activity)
         summary["recent_update"] = _short("；".join(activity), 240)
 
-    if summary["status"] == "onboarding" and not summary["blocker"] and (note_path or web_message):
-        summary["next_action"] = "先阅读最近笔记和讨论，再与用户确认研究问题及下一步目标。"
+    if summary["status"] == "onboarding" and not summary["blocker"] and note_path:
+        summary["next_action"] = "先阅读最近笔记，再与用户确认研究问题及下一步目标。"
 
     if (
         sections.get("next_action")
@@ -199,8 +210,6 @@ def _add_continuation(project: Project, summary: dict[str, object]) -> None:
     ]
     if note_path:
         files.append(project.root / note_path)
-    if web_message:
-        files.append(project.root / ".co-math" / "web" / "conversation.json")
     existing = []
     for path in files:
         safe = _safe_path(project.root, path)
@@ -213,7 +222,7 @@ def _add_continuation(project: Project, summary: dict[str, object]) -> None:
     lines = [
         "请在以下项目中继续已有研究，遵循项目内指引及已选领域 Skill 的流程。",
         f"项目路径：{project.root}",
-        f"研究问题：{summary['question']}",
+        f"研究问题：{summary['question'] or '尚未记录。'}",
         f"目标与工作流进度：{summary['progress']}",
         f"最近进展：{summary['recent_update'] or '尚未记录。'}",
         f"未解决问题：{unresolved}",
@@ -224,7 +233,7 @@ def _add_continuation(project: Project, summary: dict[str, object]) -> None:
         f"下一步：{summary['next_action']}",
         "先阅读以下现有文件（路径相对项目），再阅读其中引用的工作流和审阅记录：",
         *(f"- {path}" for path in existing),
-        "笔记和网页提问仅表示近期活动；请核对原文与证据，不据此认定结论已证明或问题、目标已获批准。",
+        "请核对研究结论的原文与证据，并检查问题和目标的确认记录。",
     ))
     summary["resume_prompt"] = "\n".join(lines)
 
@@ -319,36 +328,6 @@ def _latest_note(project: Project) -> tuple[str, str]:
     return "", ""
 
 
-def _latest_web_message(project: Project) -> str:
-    text = _optional_text(project.root, project.root / ".co-math" / "web" / "conversation.json")
-    try:
-        data = json.loads(text)
-    except (ValueError, RecursionError):
-        return ""
-    if not isinstance(data, Mapping) or not isinstance(data.get("messages"), list):
-        return ""
-    acknowledgements = {
-        "ok", "okay", "yes", "thanks", "continue", "go on",
-        "好", "好的", "收到", "谢谢", "继续", "继续吧",
-    }
-    for message in reversed(data["messages"]):
-        if not isinstance(message, Mapping) or message.get("role") != "user":
-            continue
-        content = message.get("content")
-        if not isinstance(content, str) or not content.strip() or len(content) > 20_000:
-            continue
-        try:
-            content.encode("utf-8")
-        except UnicodeError:
-            continue
-        compact = " ".join(content.split())
-        if compact.casefold().strip("。.!！?？,，;；:：") in acknowledgements:
-            continue
-        if any(character.isalnum() for character in compact):
-            return _short(compact)
-    return ""
-
-
 def _workstream_state(workspace: Path, errors: list[str]) -> dict[str, Any]:
     state: dict[str, Any] = {
         "active": [],
@@ -356,6 +335,7 @@ def _workstream_state(workspace: Path, errors: list[str]) -> dict[str, Any]:
         "needs_execution": [],
         "needs_review": [],
         "blocker": "",
+        "reports": [],
     }
     directory = workspace / "workstreams"
     if directory.is_symlink() or not directory.is_dir():
@@ -366,23 +346,22 @@ def _workstream_state(workspace: Path, errors: list[str]) -> dict[str, Any]:
         if workstream.is_symlink() or not workstream.is_dir():
             continue
         status_path = workstream / "status.yaml"
-        if not status_path.exists():
+        if status_path.is_symlink() or not status_path.is_file():
             continue
         try:
             status = read_yaml(status_path)
             if not isinstance(status, dict):
                 raise ValueError("status.yaml must contain a mapping")
             title = str(status.get("title") or workstream.name)
-            if str(status.get("status", "active")) == "complete":
-                gate = check_workstream_completion(workspace, workstream.name)
-                if gate.passed:
-                    state["complete"].append(title)
-                else:
-                    errors.append(gate.issues[0])
-                continue
-
             report = workstream / "report.md"
+            marked_complete = status.get("status", "active") == "complete"
+            if report.is_symlink():
+                errors.append(f"{workstream.name}: report.md is a symbolic link.")
+                continue
             if not report.is_file():
+                if marked_complete:
+                    errors.append(f"{workstream.name}: report.md is missing.")
+                    continue
                 state["active"].append(title)
                 state["needs_execution"].append(title)
                 continue
@@ -391,9 +370,26 @@ def _workstream_state(workspace: Path, errors: list[str]) -> dict[str, Any]:
                 (issue for issue in gate.issues if "blocking review" in issue.lower()),
                 "",
             )
-            if blocking and not state["blocker"]:
+            reviews = workstream / "reviews"
+            review_paths = [
+                path.relative_to(workspace.parent).as_posix()
+                for path in sorted(reviews.iterdir())
+                if path.suffix in {".json", ".md"} and not path.name.startswith(".")
+                and not path.is_symlink() and path.is_file()
+            ] if reviews.is_dir() and not reviews.is_symlink() else []
+            state["reports"].append({
+                "title": title,
+                "path": report.relative_to(workspace.parent).as_posix(),
+                "review_status": "reviewed" if gate.passed else "blocked" if blocking else "pending",
+                "reviews": review_paths,
+            })
+            if marked_complete and not gate.passed:
+                errors.append(gate.issues[0])
+                continue
+            if blocking:
                 state["active"].append(title)
-                state["blocker"] = blocking
+                if not state["blocker"]:
+                    state["blocker"] = blocking
             elif gate.passed:
                 state["complete"].append(title)
             elif any("missing a" in issue.lower() for issue in gate.issues):

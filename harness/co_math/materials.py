@@ -14,7 +14,7 @@ from .word_math import read_word_paragraph
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PREVIEW_CHARACTERS = 200_000
-TEXT_SUFFIXES = {".md", ".txt", ".tex", ".csv", ".json", ".yaml", ".yml", ".py", ".lean", ".bib"}
+TEXT_SUFFIXES = {".md", ".txt", ".tex", ".csv", ".json", ".yaml", ".yml", ".py", ".lean", ".bib", ".log"}
 MATERIAL_SUFFIXES = TEXT_SUFFIXES | {".pdf", ".docx"}
 
 

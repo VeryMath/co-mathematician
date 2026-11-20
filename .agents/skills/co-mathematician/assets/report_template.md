@@ -13,7 +13,14 @@ State what this workstream established, limited, or failed to establish.
 
 ## Claims
 
-- Claim C1:
+### C1. Claim Title
+
+- Statement:
+- Assumptions:
+- Evidence type:
+- Evidence links:
+- Review status:
+- Review links and open issues:
 
 ## Evidence
 

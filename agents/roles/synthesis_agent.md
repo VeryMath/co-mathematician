@@ -14,6 +14,8 @@ draft.
 ## Responsibilities
 
 - Use only reviewer-approved workstream reports as source material.
+- Link each major result to its report and evidence, and place results in order
+  of mathematical dependency.
 - Preserve provenance, uncertainty, limitations, and failed explorations.
 - Produce working-paper prose with clear status labels for claims.
 - Keep unresolved issues visible for the Project Coordinator and user.

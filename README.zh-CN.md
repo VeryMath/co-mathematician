@@ -8,7 +8,7 @@
 
 [English](README.md) · [快速开始](#quick-start) · [架构](#architecture) · [完整使用说明](docs/local-web.md)
 
-![version](https://img.shields.io/badge/version-0.3.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.4.0-blue) [![GitHub stars](https://img.shields.io/github/stars/VeryMath/co-mathematician?style=flat)](https://github.com/VeryMath/co-mathematician) ![license](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
@@ -69,7 +69,7 @@ Co-Mathematician（简称 Co-Math）帮你把一个研究问题保存为独立�
 请帮我启动 Co-Math 阅读网页，告诉我访问地址和应打开的项目文件夹。
 ```
 
-打开 agent 给出的地址，点击“打开项目”，选择同一个研究项目。你可以阅读论文、公式、笔记和进展；agent 保存文件后，页面会更新，也可以手动刷新。
+打开 agent 给出的地址，点击“打开项目”，选择同一个研究项目。从“研究概览”查看当前问题、进展和下一步，再点击报告、笔记或论文。报告中的证据链接可以直接打开同一项目内的文件和 PDF 指定页。agent 保存文件后，页面会更新，也可以手动刷新。
 
 研究任务和对话继续在 coding agent 中完成，网页只负责查看。**无需为网页另填 API Key。**
 
@@ -180,6 +180,13 @@ Skill 在 coding agent 中指导研究，由 agent 使用其可用工具执行�
 **外部 coding agent 的私有对话不会自动同步。** 请让 agent 把有用的笔记、结果和进展保存到项目。网页展示这些文件，以及项目中已有的历史网页对话；文件更新不会让网页获得 agent 的私有聊天。数据位置与刷新说明见[网页使用说明](docs/local-web.md)。
 
 ## 版本更新
+
+### 0.4.0（2026-11-20）
+
+- 打开项目时进入研究概览，查看研究问题、最近进展、未解决问题和下一步，并打开报告和审查记录。`co-math resume` 读取同一份项目状态。
+- 报告模板按关键命题记录假设、证据和核查情况。网页可从证据链接打开项目文件、指定 PDF 页、正文选段和运行日志。
+- 用 `co-math render-final --outline` 生成 `working_paper_outline.md`。提纲链接到通过审查的报告，供撰写工作论文时查考。
+- 推荐让 coding agent 安装 Co-Math、创建项目并继续研究。网页可按需打开，用于阅读已保存的项目文件。
 
 ### 项目可视化（2026-10-19）
 

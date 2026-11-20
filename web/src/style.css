@@ -57,6 +57,29 @@ html,body,#root{height:100%;overflow:hidden}
 .visualizer .document-view-tabs{margin:0 0 23px}
 .visualizer .document-view-tabs button[aria-pressed=true]{background:#ffffff;color:#171717;box-shadow:inset 0 -1px #171717;border-radius:0}
 .visualizer .source-document,.visualizer .markdown pre,.visualizer .markdown code,.visualizer .math-fallback{background:#ffffff}
+
+.project-overview{color:#171717;overflow-wrap:anywhere}
+.project-overview h1{font:500 32px/1.5 Georgia,"Songti SC",serif;margin:0 0 22px}
+.project-overview h2{font-size:15px;margin:0 0 12px;font-weight:600}
+.overview-question{padding-bottom:22px;border-bottom:1px solid var(--line)}
+.overview-question .extracted-document{font-size:14px;line-height:1.9}
+.overview-progress{margin:0;padding:10px 0 16px;border-bottom:1px solid var(--line)}
+.overview-progress>div{display:grid;grid-template-columns:7em minmax(0,1fr);gap:12px;padding:10px 0}
+.overview-progress dt{font-weight:600}
+.overview-progress dd{margin:0;line-height:1.8}
+.overview-reports{margin:24px 0}
+.overview-reports ul{list-style:none;margin:0;padding:0}
+.overview-reports li{display:flex;flex-wrap:wrap;align-items:center;gap:7px 14px;padding:10px 0;border-bottom:1px solid var(--line)}
+.overview-reports li>span,.overview-reports p{font-size:12px;color:var(--muted)}
+.overview-reviews{flex-basis:100%;font-size:12px;color:var(--muted)}
+.overview-reviews summary{cursor:pointer}
+.overview-reviews button{display:block;margin-top:8px}
+.project-file-link{display:inline;padding:0;text-align:left;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.document-toolbar .project-file-link{min-width:24px;flex-shrink:0}
+@media(max-width:640px){
+  .project-overview h1{font-size:26px}
+  .overview-progress>div{grid-template-columns:1fr;gap:5px}
+}
 .visualizer .panel-resizer{flex-basis:5px;width:5px}
 .visualizer .panel-resizer::before{left:2px;background:transparent}
 .visualizer .panel-resizer>span{left:1px;width:2px;background:#dddddd}
